@@ -19,53 +19,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const setStoreUser = useGameStore((state) => state.setUser);
-  const supabase = createClient();
 
   useEffect(() => {
     let isMounted = true;
+    const supabase = createClient();
     
-    // Check for existing session with timeout
+    // Check for existing session
     const checkUser = async () => {
       try {
-        // Add a timeout to prevent hanging
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Session check timeout')), 5000);
-        });
-        
-        const sessionPromise = supabase.auth.getSession();
-        
-        const result = await Promise.race([sessionPromise, timeoutPromise]) as Awaited<typeof sessionPromise>;
-        const { data: { session }, error: sessionError } = result;
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
         if (!isMounted) return;
         
-        if (sessionError) {
-          console.error('AuthProvider: Session error:', sessionError);
+        if (sessionError || !session?.user) {
           setLoading(false);
           return;
         }
         
-        if (session?.user) {
-          // Get user profile from our users table
-          const { data: profile, error: profileError } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
-          
-          if (!isMounted) return;
-          
-          if (profileError) {
-            console.error('AuthProvider: Profile error:', profileError);
-          }
-          
-          if (profile) {
-            setUser(profile);
-            setStoreUser(profile);
-          }
+        // Get user profile
+        const { data: profile } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+        
+        if (!isMounted) return;
+        
+        if (profile) {
+          setUser(profile);
+          setStoreUser(profile);
         }
       } catch (error) {
-        console.error('AuthProvider: Error checking user:', error);
+        console.error('AuthProvider checkUser error:', error);
       } finally {
         if (isMounted) {
           setLoading(false);
@@ -73,6 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
+    // Run the check
     checkUser();
 
     // Listen for auth changes
@@ -102,9 +88,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, [supabase, setStoreUser]);
+  }, [setStoreUser]);
 
   const signUp = async (email: string, password: string, username: string) => {
+    const supabase = createClient();
+    
     try {
       // Check if username is taken
       const { data: existingUser } = await supabase
@@ -176,11 +164,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       return {};
     } catch (error) {
+      console.error('signUp error:', error);
       return { error: 'An unexpected error occurred' };
     }
   };
 
   const signIn = async (email: string, password: string) => {
+    const supabase = createClient();
+    
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -206,11 +197,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       return {};
     } catch (error) {
+      console.error('signIn error:', error);
       return { error: 'An unexpected error occurred' };
     }
   };
 
   const signOut = async () => {
+    const supabase = createClient();
     await supabase.auth.signOut();
     setUser(null);
     setStoreUser(null);
