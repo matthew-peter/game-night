@@ -117,37 +117,31 @@ export function getRemainingAgentsPerPlayer(game: Game): {
   player2: number;
 } {
   const revealed = game.board_state.revealed;
-  const revealedIndices = new Set<number>();
   
-  // Get all revealed card indices
+  // Build a map of word -> revealed info, keyed by index
+  const revealedByIndex = new Map<number, { type: CardType; guessedBy: string }>();
   for (const word of Object.keys(revealed)) {
     const wordIndex = game.words.indexOf(word);
     if (wordIndex !== -1) {
-      revealedIndices.add(wordIndex);
-    } else {
-      // Debug: word not found in game.words array
-      console.warn('Word not found in game.words:', word, 'Available words:', game.words);
+      revealedByIndex.set(wordIndex, revealed[word]);
     }
   }
   
   // Count remaining agents for each player
-  // remaining.player1 = unrevealed agents on player1's key = light green on player1's board
-  // This is what player2 needs to guess
-  const player1Remaining = game.key_card.player1.agents.filter(
-    idx => !revealedIndices.has(idx)
-  ).length;
+  // An agent is "remaining" if:
+  // 1. It's not revealed at all, OR
+  // 2. It was revealed but NOT as an agent (meaning it's still "light green" on this player's board)
+  const player1Remaining = game.key_card.player1.agents.filter(idx => {
+    const rev = revealedByIndex.get(idx);
+    if (!rev) return true; // not revealed
+    return rev.type !== 'agent'; // revealed but not as agent = still counts as remaining for display
+  }).length;
   
-  const player2Remaining = game.key_card.player2.agents.filter(
-    idx => !revealedIndices.has(idx)
-  ).length;
-  
-  console.log('getRemainingAgentsPerPlayer:', {
-    player1Agents: game.key_card.player1.agents,
-    player2Agents: game.key_card.player2.agents,
-    revealedIndices: Array.from(revealedIndices),
-    player1Remaining,
-    player2Remaining
-  });
+  const player2Remaining = game.key_card.player2.agents.filter(idx => {
+    const rev = revealedByIndex.get(idx);
+    if (!rev) return true;
+    return rev.type !== 'agent';
+  }).length;
   
   return { 
     player1: player1Remaining, 
