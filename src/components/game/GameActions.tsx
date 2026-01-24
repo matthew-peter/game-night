@@ -26,11 +26,11 @@ export function GameActions({
 }: GameActionsProps) {
   const { moves } = useGameStore();
   
-  const isMyTurn = game.current_turn === playerRole;
+  const isClueGiver = game.current_turn === playerRole;
+  const isGuesser = game.current_turn !== playerRole;
   const isGuessPhase = game.current_phase === 'guess';
-  // Guesser: it's my turn and we're in guess phase
-  const isGuessing = isMyTurn && isGuessPhase;
-  const isClueGiver = isMyTurn && game.current_phase === 'clue';
+  // Guesser: I'm NOT the clue giver and we're in guess phase
+  const isGuessing = isGuesser && isGuessPhase && game.status === 'playing';
   
   const canEndTurn = isGuessing && guessCount > 0;
   

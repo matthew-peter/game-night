@@ -17,8 +17,10 @@ interface WordCardProps {
   isGivingClue: boolean;
   isGuessing: boolean;
   isSelected: boolean;
+  isHighlightedForGuess: boolean;
   onToggleSelect: (word: string) => void;
-  onGuess: (wordIndex: number) => void;
+  onHighlightForGuess: (wordIndex: number) => void;
+  onConfirmGuess: (wordIndex: number) => void;
 }
 
 function WordCard({
@@ -29,8 +31,10 @@ function WordCard({
   isGivingClue,
   isGuessing,
   isSelected,
+  isHighlightedForGuess,
   onToggleSelect,
-  onGuess,
+  onHighlightForGuess,
+  onConfirmGuess,
 }: WordCardProps) {
   const [showDefinition, setShowDefinition] = useState(false);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
@@ -95,6 +99,11 @@ function WordCard({
     ? 'ring-4 ring-blue-500 ring-offset-2 scale-105' 
     : '';
   
+  // Highlight state for guessing (first tap)
+  const highlightStyles = isHighlightedForGuess && !isRevealed
+    ? 'ring-4 ring-amber-400 ring-offset-2 scale-105'
+    : '';
+  
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     e.preventDefault(); // Prevent click from also firing
     isLongPress.current = false;
@@ -114,20 +123,28 @@ function WordCard({
       if (isGivingClue) {
         onToggleSelect(word);
       } else if (isGuessing) {
-        onGuess(index);
+        if (isHighlightedForGuess) {
+          onConfirmGuess(index);
+        } else {
+          onHighlightForGuess(index);
+        }
       }
     }
-  }, [isGivingClue, isGuessing, isRevealed, word, index, onToggleSelect, onGuess]);
+  }, [isGivingClue, isGuessing, isRevealed, isHighlightedForGuess, word, index, onToggleSelect, onHighlightForGuess, onConfirmGuess]);
   
   const handleClick = useCallback(() => {
     if (!isRevealed) {
       if (isGivingClue) {
         onToggleSelect(word);
       } else if (isGuessing) {
-        onGuess(index);
+        if (isHighlightedForGuess) {
+          onConfirmGuess(index);
+        } else {
+          onHighlightForGuess(index);
+        }
       }
     }
-  }, [isGivingClue, isGuessing, isRevealed, word, index, onToggleSelect, onGuess]);
+  }, [isGivingClue, isGuessing, isRevealed, isHighlightedForGuess, word, index, onToggleSelect, onHighlightForGuess, onConfirmGuess]);
   
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -143,6 +160,7 @@ function WordCard({
           'touch-manipulation select-none',
           styles.card,
           selectionStyles,
+          highlightStyles,
           !isRevealed && (isGivingClue || isGuessing) && 'active:scale-95 cursor-pointer',
         )}
         onClick={handleClick}
@@ -174,6 +192,15 @@ function WordCard({
             <span className="text-white text-[10px] font-bold">✓</span>
           </div>
         )}
+        
+        {/* Highlight for guess - tap again prompt */}
+        {isHighlightedForGuess && !isRevealed && (
+          <div className="absolute inset-0 flex items-center justify-center bg-amber-500/30">
+            <span className="text-[9px] font-bold text-amber-900 bg-white/80 px-1.5 py-0.5 rounded">
+              TAP TO CONFIRM
+            </span>
+          </div>
+        )}
       </button>
       
       {showDefinition && (
@@ -195,15 +222,26 @@ interface GameBoardProps {
 
 export function GameBoard({ game, playerRole, onGuess, hasActiveClue = false }: GameBoardProps) {
   const { selectedWordsForClue, toggleWordForClue } = useGameStore();
+  const [highlightedWordIndex, setHighlightedWordIndex] = useState<number | null>(null);
   
-  const isMyTurn = game.current_turn === playerRole;
+  const isClueGiver = game.current_turn === playerRole;
+  const isGuesser = game.current_turn !== playerRole;
   const isCluePhase = game.current_phase === 'clue';
   const isGuessPhase = game.current_phase === 'guess';
   
-  // Clue giver: it's my turn and we're in clue phase
-  const isGivingClue = isMyTurn && isCluePhase && game.status === 'playing';
-  // Guesser: it's my turn and we're in guess phase
-  const isGuessing = isMyTurn && isGuessPhase && game.status === 'playing';
+  // Clue giver: I'm the clue giver and we're in clue phase
+  const isGivingClue = isClueGiver && isCluePhase && game.status === 'playing';
+  // Guesser: I'm NOT the clue giver and we're in guess phase
+  const isGuessing = isGuesser && isGuessPhase && game.status === 'playing';
+  
+  const handleHighlightForGuess = useCallback((wordIndex: number) => {
+    setHighlightedWordIndex(prev => prev === wordIndex ? null : wordIndex);
+  }, []);
+  
+  const handleConfirmGuess = useCallback((wordIndex: number) => {
+    setHighlightedWordIndex(null);
+    onGuess(wordIndex);
+  }, [onGuess]);
   
   return (
     <div className="w-full max-w-md mx-auto px-1">
@@ -218,8 +256,10 @@ export function GameBoard({ game, playerRole, onGuess, hasActiveClue = false }: 
             isGivingClue={isGivingClue}
             isGuessing={isGuessing}
             isSelected={selectedWordsForClue.has(word)}
+            isHighlightedForGuess={highlightedWordIndex === index}
             onToggleSelect={toggleWordForClue}
-            onGuess={onGuess}
+            onHighlightForGuess={handleHighlightForGuess}
+            onConfirmGuess={handleConfirmGuess}
           />
         ))}
       </div>

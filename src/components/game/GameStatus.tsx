@@ -13,13 +13,36 @@ interface GameStatusProps {
 }
 
 export function GameStatus({ game, playerRole, opponentName, currentClue, guessCount = 0 }: GameStatusProps) {
-  const isMyTurn = game.current_turn === playerRole;
+  const isClueGiver = game.current_turn === playerRole;
+  const isCluePhase = game.current_phase === 'clue';
+  const isGuessPhase = game.current_phase === 'guess';
+  
   const agentsFound = countAgentsFound(game.board_state);
   const totalAgents = countTotalAgentsNeeded(game.key_card);
   const remaining = getRemainingAgentsPerPlayer(game);
   
   const myRemaining = playerRole === 'player1' ? remaining.player1 : remaining.player2;
   const theirRemaining = playerRole === 'player1' ? remaining.player2 : remaining.player1;
+  
+  // Determine what to show
+  const myAction = isClueGiver && isCluePhase;
+  const theirGuessing = isClueGiver && isGuessPhase;
+  const theirCluing = !isClueGiver && isCluePhase;
+  const myGuessing = !isClueGiver && isGuessPhase;
+  
+  let statusText = '';
+  let isActive = false;
+  if (myAction) {
+    statusText = '⚡ GIVE A CLUE';
+    isActive = true;
+  } else if (myGuessing) {
+    statusText = '⚡ YOUR GUESS';
+    isActive = true;
+  } else if (theirGuessing) {
+    statusText = `${opponentName || 'Partner'} guessing...`;
+  } else if (theirCluing) {
+    statusText = `${opponentName || 'Partner'} giving clue...`;
+  }
   
   return (
     <div className="bg-stone-700 px-3 py-2">
@@ -29,9 +52,9 @@ export function GameStatus({ game, playerRole, opponentName, currentClue, guessC
           {/* Turn indicator */}
           <div className={cn(
             'px-3 py-1 rounded-full text-xs font-bold',
-            isMyTurn ? 'bg-emerald-600 text-white' : 'bg-stone-500 text-white'
+            isActive ? 'bg-emerald-600 text-white' : 'bg-stone-500 text-white'
           )}>
-            {isMyTurn ? '⚡ YOUR TURN' : `${opponentName || 'Opponent'}'s turn`}
+            {statusText}
           </div>
           
           {/* Timer + Score compact */}

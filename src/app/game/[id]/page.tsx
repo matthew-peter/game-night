@@ -162,13 +162,13 @@ function GamePageContent({ gameId }: { gameId: string }) {
       return;
     }
 
-    // Update game state - switch turn to the other player (who will guess)
-    const nextTurn = playerRole === 'player1' ? 'player2' : 'player1';
+    // Update game state - stay on current turn, just change phase to guess
+    // The OTHER player will now guess based on this clue
     const { error: gameError } = await supabase
       .from('games')
       .update({
         current_phase: 'guess',
-        current_turn: nextTurn,
+        // current_turn stays the same - it represents the clue giver
       })
       .eq('id', game.id);
 
