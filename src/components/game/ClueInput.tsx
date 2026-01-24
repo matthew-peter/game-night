@@ -55,7 +55,7 @@ export function ClueInput({ game, playerRole, onGiveClue, hasActiveClue = false 
   const selectedCount = selectedWordsForClue.size;
   
   return (
-    <div className="bg-stone-800 border-t border-stone-600 px-2 py-2">
+    <div className="bg-stone-800/80 rounded-lg px-3 py-3">
       <div className="max-w-lg mx-auto">
         <div className="flex items-center gap-2 mb-2">
           <span className="text-xs text-white/70">🎯 Your turn:</span>

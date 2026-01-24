@@ -385,8 +385,20 @@ function GamePageContent({ gameId }: { gameId: string }) {
           hasActiveClue={hasActiveClue}
         />
         
+        {/* Clue input - right below the board */}
+        {isMyTurn && game.current_phase === 'clue' && (
+          <div className="mx-1 mt-2">
+            <ClueInput
+              game={game}
+              playerRole={playerRole}
+              onGiveClue={handleGiveClue}
+              hasActiveClue={hasActiveClue}
+            />
+          </div>
+        )}
+        
         {/* Inline move history - uses remaining space */}
-        <div className="flex-1 mt-2 bg-stone-800/50 rounded-lg mx-1 min-h-[120px] max-h-[200px] overflow-hidden">
+        <div className="flex-1 mt-2 bg-stone-800/50 rounded-lg mx-1 min-h-[100px] max-h-[180px] overflow-hidden">
           <InlineHistory
             moves={moves}
             playerRole={playerRole}
@@ -410,15 +422,6 @@ function GamePageContent({ gameId }: { gameId: string }) {
         hasActiveClue={hasActiveClue}
         guessCount={guessCount}
       />
-      
-      {isMyTurn && game.current_phase === 'clue' && (
-        <ClueInput
-          game={game}
-          playerRole={playerRole}
-          onGiveClue={handleGiveClue}
-          hasActiveClue={hasActiveClue}
-        />
-      )}
     </div>
   );
 }
