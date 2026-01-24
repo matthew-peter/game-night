@@ -9,6 +9,7 @@ import { GameStatus } from '@/components/game/GameStatus';
 import { ClueInput } from '@/components/game/ClueInput';
 import { GameActions } from '@/components/game/GameActions';
 import { GameReview } from '@/components/game/GameReview';
+import { InlineHistory } from '@/components/game/InlineHistory';
 import { useGameStore } from '@/lib/store/gameStore';
 import { createClient } from '@/lib/supabase/client';
 import { Game, Move, CurrentTurn } from '@/lib/supabase/types';
@@ -365,13 +366,26 @@ function GamePageContent({ gameId }: { gameId: string }) {
         guessCount={guessCount}
       />
       
-      <main className="flex-1 overflow-auto py-2 px-1">
+      <main className="flex-1 overflow-auto py-2 px-1 flex flex-col">
         <GameBoard
           game={game}
           playerRole={playerRole}
           onGuess={handleGuess}
           hasActiveClue={hasActiveClue}
         />
+        
+        {/* Inline move history - uses remaining space */}
+        <div className="flex-1 mt-2 bg-stone-800/50 rounded-lg mx-1 min-h-[120px] max-h-[200px] overflow-hidden">
+          <InlineHistory
+            moves={moves}
+            playerRole={playerRole}
+            player1Name={playerRole === 'player1' ? user.username : opponent?.username || 'Player 1'}
+            player2Name={playerRole === 'player2' ? user.username : opponent?.username || 'Player 2'}
+            player1Id={game.player1_id}
+            player2Id={game.player2_id || ''}
+            words={game.words}
+          />
+        </div>
       </main>
       
       <GameActions
