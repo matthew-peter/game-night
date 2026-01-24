@@ -36,7 +36,7 @@ export function GameActions({
   
   return (
     <div className="bg-stone-800 border-t border-stone-600 px-2 py-2">
-      <div className="max-w-lg mx-auto flex items-center justify-between">
+      <div className="max-w-md mx-auto flex items-center justify-between">
         <ClueHistory
           moves={moves}
           playerRole={playerRole}
@@ -45,26 +45,21 @@ export function GameActions({
           words={game.words}
         />
         
-        {canEndTurn && (
-          <Button
-            onClick={onEndTurn}
-            className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold shadow-lg"
-          >
-            End Turn
-          </Button>
-        )}
-        
-        {isClueGiver && (
-          <div className="text-sm text-white/60 italic">
-            Select words & give clue below
-          </div>
-        )}
-        
-        {!isMyTurn && !isGuessing && (
-          <div className="text-sm text-white/60 italic animate-pulse">
-            Waiting for opponent...
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {isGuessing && (
+            <span className="text-xs text-stone-400">Tap a word to guess</span>
+          )}
+          
+          {canEndTurn && (
+            <Button
+              onClick={onEndTurn}
+              size="sm"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+            >
+              End Turn
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );
