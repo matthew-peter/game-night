@@ -104,9 +104,18 @@ CREATE POLICY "Authenticated users can create games"
   ON public.games FOR INSERT
   WITH CHECK (auth.uid() = player1_id);
 
+-- Allow existing players to update, AND allow anyone to join a waiting game
 CREATE POLICY "Players can update their games"
   ON public.games FOR UPDATE
-  USING (player1_id = auth.uid() OR player2_id = auth.uid());
+  USING (
+    player1_id = auth.uid() 
+    OR player2_id = auth.uid()
+    OR (status = 'waiting' AND player2_id IS NULL)
+  )
+  WITH CHECK (
+    player1_id = auth.uid() 
+    OR player2_id = auth.uid()
+  );
 
 -- Moves policies
 CREATE POLICY "Players can view moves in their games"
