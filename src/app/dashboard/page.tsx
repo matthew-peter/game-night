@@ -37,7 +37,7 @@ function DashboardContent() {
   const [firstClueGiver, setFirstClueGiver] = useState<'creator' | 'joiner'>('creator');
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
-  // Fetch active games
+  // Fetch active games and subscribe to changes
   useEffect(() => {
     if (!user) return;
 
@@ -79,6 +79,34 @@ function DashboardContent() {
     };
 
     fetchActiveGames();
+
+    // Subscribe to game deletions and updates
+    const channel = supabase
+      .channel('dashboard-games')
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'games' },
+        (payload) => {
+          // Remove deleted game from state
+          setActiveGames(prev => prev.filter(g => g.id !== payload.old.id));
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'games' },
+        (payload) => {
+          const updatedGame = payload.new as Game;
+          // If game is now completed or lost, remove from active games
+          if (updatedGame.status === 'completed' || updatedGame.status === 'lost') {
+            setActiveGames(prev => prev.filter(g => g.id !== updatedGame.id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user, supabase]);
 
   const handleDeleteGame = async (gameId: string, e: React.MouseEvent) => {
