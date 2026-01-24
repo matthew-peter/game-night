@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Menu, User, LogOut, History, Home } from 'lucide-react';
+import { Menu, LogOut, History, Home, RefreshCw } from 'lucide-react';
 
 export function Header() {
   const { user, signOut } = useAuth();
@@ -50,6 +50,13 @@ export function Header() {
                   <History className="mr-2 h-4 w-4" />
                   Game History
                 </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => window.location.reload()}
+                className="cursor-pointer"
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Reload App
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem

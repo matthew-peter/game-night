@@ -100,7 +100,7 @@ function GamePageContent({ gameId }: { gameId: string }) {
 
     fetchGame();
 
-    // Subscribe to game changes
+    // Subscribe to game changes (UPDATE and DELETE)
     const gameChannel = supabase
       .channel(`game-${gameId}`)
       .on(
@@ -114,6 +114,19 @@ function GamePageContent({ gameId }: { gameId: string }) {
         (payload) => {
           const updatedGame = payload.new as Game;
           setGame(updatedGame);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'games',
+          filter: `id=eq.${gameId}`,
+        },
+        () => {
+          toast.info('This game has been deleted');
+          router.push('/dashboard');
         }
       )
       .subscribe();
@@ -179,18 +192,19 @@ function GamePageContent({ gameId }: { gameId: string }) {
     }
 
     // Notify opponent it's their turn to guess
+    // The opponent is the guesser (not the clue giver)
     if (opponent) {
-      sendTurnNotification(
+      await sendTurnNotification(
         game.id,
         opponent.id,
         user.username,
-        `${user.username} gave a clue: ${clue} (${clueNumber})`
+        `${user.username} gave clue: "${clue.toUpperCase()}" (${clueNumber}) - Your turn to guess!`
       );
     }
 
     clearSelectedWords();
     toast.success(`Clue given: ${clue} (${clueNumber})`);
-  }, [game, user, playerRole, supabase, clearSelectedWords]);
+  }, [game, user, playerRole, supabase, clearSelectedWords, opponent]);
 
   // Handle guessing a word
   const handleGuess = useCallback(async (wordIndex: number) => {
@@ -254,11 +268,11 @@ function GamePageContent({ gameId }: { gameId: string }) {
       
       // Notify opponent it's their turn to give a clue
       if (opponent) {
-        sendTurnNotification(
+        await sendTurnNotification(
           game.id,
           opponent.id,
           user.username,
-          `${user.username} hit a bystander. Your turn to give a clue!`
+          `${user.username} hit a bystander - Your turn to give a clue!`
         );
       }
       
@@ -277,7 +291,7 @@ function GamePageContent({ gameId }: { gameId: string }) {
     if (gameError) {
       toast.error('Failed to update game');
     }
-  }, [game, user, playerRole, supabase]);
+  }, [game, user, playerRole, supabase, opponent]);
 
   // Handle ending turn voluntarily
   const handleEndTurn = useCallback(async () => {
@@ -312,11 +326,11 @@ function GamePageContent({ gameId }: { gameId: string }) {
     } else {
       // Notify opponent it's their turn
       if (opponent) {
-        sendTurnNotification(
+        await sendTurnNotification(
           game.id,
           opponent.id,
           user.username,
-          `${user.username} ended their turn. Your turn to give a clue!`
+          `${user.username} ended their turn - Your turn to give a clue!`
         );
       }
       toast.info('Turn ended');
