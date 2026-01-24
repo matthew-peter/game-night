@@ -46,7 +46,7 @@ export function checkAssassinHit(boardState: BoardState): boolean {
  * Checks if the game is in sudden death (no tokens left)
  */
 export function isInSuddenDeath(game: Game): boolean {
-  return game.timer_tokens_remaining <= 0;
+  return game.sudden_death || game.timer_tokens <= 0;
 }
 
 /**
@@ -92,7 +92,7 @@ export function processGuess(
   const won = agentsFound >= totalNeeded;
   
   // In sudden death, hitting a bystander is also game over
-  const suddenDeath = game.timer_tokens_remaining <= 0;
+  const suddenDeath = game.sudden_death || game.timer_tokens <= 0;
   const suddenDeathLoss = suddenDeath && cardType === 'bystander';
   
   const gameOver = assassinHit || won || suddenDeathLoss;

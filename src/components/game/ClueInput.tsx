@@ -12,17 +12,18 @@ import { cn } from '@/lib/utils';
 interface ClueInputProps {
   game: Game;
   playerRole: CurrentTurn;
-  onGiveClue: (clue: string, intendedWords: string[]) => void;
+  onGiveClue: (clue: string, intendedWordIndices: number[]) => void;
+  hasActiveClue?: boolean;
 }
 
-export function ClueInput({ game, playerRole, onGiveClue }: ClueInputProps) {
+export function ClueInput({ game, playerRole, onGiveClue, hasActiveClue = false }: ClueInputProps) {
   const [clue, setClue] = useState('');
   const [error, setError] = useState<string | null>(null);
   const { selectedWordsForClue, clearSelectedWords } = useGameStore();
   
   const isMyTurn = game.current_turn === playerRole;
-  const hasActiveClue = !!game.current_clue;
-  const isGivingClue = isMyTurn && !hasActiveClue && game.status === 'playing';
+  const isCluePhase = game.current_phase === 'clue';
+  const isGivingClue = isMyTurn && isCluePhase && game.status === 'playing';
   
   if (!isGivingClue) return null;
   
@@ -41,9 +42,12 @@ export function ClueInput({ game, playerRole, onGiveClue }: ClueInputProps) {
       return;
     }
     
-    const intendedWords = Array.from(selectedWordsForClue);
+    // Convert selected words to indices
+    const intendedWordIndices = Array.from(selectedWordsForClue).map(word => 
+      game.words.indexOf(word)
+    ).filter(idx => idx !== -1);
     
-    onGiveClue(trimmedClue, intendedWords);
+    onGiveClue(trimmedClue, intendedWordIndices);
     setClue('');
     clearSelectedWords();
   };

@@ -37,7 +37,7 @@ function HistoryContent() {
         .select('*')
         .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
         .in('status', ['completed', 'abandoned'])
-        .order('completed_at', { ascending: false })
+        .order('ended_at', { ascending: false })
         .limit(50);
 
       if (error) {
@@ -121,8 +121,7 @@ function HistoryContent() {
             <div className="space-y-3 pr-4">
               {games.map((game) => {
                 const playerRole = game.player1_id === user.id ? 'player1' : 'player2';
-                const won = game.winner !== null && game.status === 'completed' && 
-                  !Object.values(game.board_state.revealed).some(r => r.type === 'assassin');
+                const won = game.result === 'win';
                 const agentsFound = countAgentsFound(game.board_state);
                 const totalAgents = countTotalAgentsNeeded(game.key_card);
                 const assassinHit = Object.values(game.board_state.revealed).some(r => r.type === 'assassin');
@@ -154,7 +153,7 @@ function HistoryContent() {
                             Agents: {agentsFound}/{totalAgents}
                           </span>
                           <span>
-                            {game.completed_at && formatDistanceToNow(new Date(game.completed_at), { addSuffix: true })}
+                            {game.ended_at && formatDistanceToNow(new Date(game.ended_at), { addSuffix: true })}
                           </span>
                         </div>
                       </CardContent>

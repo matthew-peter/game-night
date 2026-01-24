@@ -11,7 +11,7 @@ import { GameActions } from '@/components/game/GameActions';
 import { GameReview } from '@/components/game/GameReview';
 import { useGameStore } from '@/lib/store/gameStore';
 import { createClient } from '@/lib/supabase/client';
-import { Game, Move, User, CurrentTurn } from '@/lib/supabase/types';
+import { Game, Move, CurrentTurn } from '@/lib/supabase/types';
 import { processGuess, getNextTurn } from '@/lib/game/gameLogic';
 import { toast } from 'sonner';
 
@@ -142,27 +142,21 @@ function GamePageContent({ gameId }: { gameId: string }) {
   }, [gameId, user, supabase, router, setGame, setMoves, addMove, setOpponent]);
 
   // Handle giving a clue
-  const handleGiveClue = useCallback(async (clue: string, intendedWords: string[]) => {
+  const handleGiveClue = useCallback(async (clue: string, intendedWordIndices: number[]) => {
     if (!game || !user || !playerRole) return;
 
-    const clueNumber = intendedWords.length;
+    const clueNumber = intendedWordIndices.length;
 
-    // Create move record
-    const moveId = crypto.randomUUID();
-    const move: Omit<Move, 'created_at'> = {
-      id: moveId,
+    // Insert move via API or directly
+    const { error: moveError } = await supabase.from('moves').insert({
       game_id: game.id,
       player_id: user.id,
       move_type: 'clue',
       clue_word: clue,
-      intended_words: intendedWords,
+      intended_words: intendedWordIndices,
       clue_number: clueNumber,
-      guessed_word: null,
-      result: null,
-    };
+    });
 
-    // Insert move
-    const { error: moveError } = await supabase.from('moves').insert(move);
     if (moveError) {
       toast.error('Failed to give clue');
       return;
@@ -172,8 +166,7 @@ function GamePageContent({ gameId }: { gameId: string }) {
     const { error: gameError } = await supabase
       .from('games')
       .update({
-        current_clue: { word: clue, number: clueNumber, intendedWords },
-        guesses_this_turn: 0,
+        current_phase: 'guess',
       })
       .eq('id', game.id);
 
@@ -201,52 +194,50 @@ function GamePageContent({ gameId }: { gameId: string }) {
     // Process the guess
     const result = processGuess(game, wordIndex, playerRole);
 
-    // Create move record
-    const moveId = crypto.randomUUID();
-    const move: Omit<Move, 'created_at'> = {
-      id: moveId,
+    // Insert move
+    const { error: moveError } = await supabase.from('moves').insert({
       game_id: game.id,
       player_id: user.id,
       move_type: 'guess',
-      clue_word: null,
-      intended_words: null,
-      clue_number: null,
-      guessed_word: word,
-      result: result.cardType,
-    };
+      guess_index: wordIndex,
+      guess_result: result.cardType,
+    });
 
-    // Insert move
-    const { error: moveError } = await supabase.from('moves').insert(move);
     if (moveError) {
       toast.error('Failed to record guess');
       return;
     }
 
     // Prepare game updates
-    const updates: Partial<Game> = {
+    const updates: Record<string, unknown> = {
       board_state: result.newBoardState,
-      guesses_this_turn: game.guesses_this_turn + 1,
     };
 
     // Handle game over
     if (result.gameOver) {
       updates.status = 'completed';
-      updates.completed_at = new Date().toISOString();
+      updates.ended_at = new Date().toISOString();
       
       if (result.won) {
-        updates.winner = playerRole;
+        updates.result = 'win';
         toast.success('🎉 You found all the agents!');
       } else if (result.cardType === 'assassin') {
+        updates.result = 'loss';
         toast.error('💀 Assassin revealed! Game over.');
       } else {
+        updates.result = 'loss';
         toast.error('Time ran out!');
       }
     } else if (result.turnEnds) {
       // Bystander hit, turn ends, lose a token
+      const newTokens = game.timer_tokens - 1;
       updates.current_turn = getNextTurn(game.current_turn);
-      updates.current_clue = null;
-      updates.guesses_this_turn = 0;
-      updates.timer_tokens_remaining = game.timer_tokens_remaining - 1;
+      updates.current_phase = 'clue';
+      updates.timer_tokens = newTokens;
+      
+      if (newTokens <= 0) {
+        updates.sudden_death = true;
+      }
       
       toast.info('Bystander! Turn over.');
     } else {
@@ -270,30 +261,27 @@ function GamePageContent({ gameId }: { gameId: string }) {
     if (!game || !user || !playerRole) return;
 
     // Create end turn move
-    const moveId = crypto.randomUUID();
-    const move: Omit<Move, 'created_at'> = {
-      id: moveId,
+    await supabase.from('moves').insert({
       game_id: game.id,
       player_id: user.id,
       move_type: 'end_turn',
-      clue_word: null,
-      intended_words: null,
-      clue_number: null,
-      guessed_word: null,
-      result: null,
-    };
-
-    await supabase.from('moves').insert(move);
+    });
 
     // Update game - end turn consumes a token
+    const newTokens = game.timer_tokens - 1;
+    const updates: Record<string, unknown> = {
+      current_turn: getNextTurn(game.current_turn),
+      current_phase: 'clue',
+      timer_tokens: newTokens,
+    };
+    
+    if (newTokens <= 0) {
+      updates.sudden_death = true;
+    }
+    
     const { error } = await supabase
       .from('games')
-      .update({
-        current_turn: getNextTurn(game.current_turn),
-        current_clue: null,
-        guesses_this_turn: 0,
-        timer_tokens_remaining: game.timer_tokens_remaining - 1,
-      })
+      .update(updates)
       .eq('id', game.id);
 
     if (error) {
@@ -334,6 +322,16 @@ function GamePageContent({ gameId }: { gameId: string }) {
   }
 
   const isMyTurn = game.current_turn === playerRole;
+  
+  // Calculate current clue from moves
+  const currentClue = moves.filter(m => m.move_type === 'clue').slice(-1)[0] || null;
+  const hasActiveClue = game.current_phase === 'guess' && currentClue !== null;
+  
+  // Count guesses this turn (guesses since last clue)
+  const lastClueIndex = moves.map(m => m.move_type).lastIndexOf('clue');
+  const guessCount = lastClueIndex >= 0 
+    ? moves.slice(lastClueIndex + 1).filter(m => m.move_type === 'guess').length 
+    : 0;
 
   return (
     <div className="min-h-screen bg-stone-50 flex flex-col">
@@ -343,6 +341,8 @@ function GamePageContent({ gameId }: { gameId: string }) {
         game={game}
         playerRole={playerRole}
         opponentName={opponent?.username}
+        currentClue={currentClue}
+        guessCount={guessCount}
       />
       
       <main className="flex-1 overflow-auto py-2">
@@ -350,6 +350,7 @@ function GamePageContent({ gameId }: { gameId: string }) {
           game={game}
           playerRole={playerRole}
           onGuess={handleGuess}
+          hasActiveClue={hasActiveClue}
         />
       </main>
       
@@ -359,13 +360,16 @@ function GamePageContent({ gameId }: { gameId: string }) {
         player1Name={playerRole === 'player1' ? user.username : opponent?.username || 'Player 1'}
         player2Name={playerRole === 'player2' ? user.username : opponent?.username || 'Player 2'}
         onEndTurn={handleEndTurn}
+        hasActiveClue={hasActiveClue}
+        guessCount={guessCount}
       />
       
-      {isMyTurn && !game.current_clue && (
+      {isMyTurn && game.current_phase === 'clue' && (
         <ClueInput
           game={game}
           playerRole={playerRole}
           onGiveClue={handleGiveClue}
+          hasActiveClue={hasActiveClue}
         />
       )}
     </div>

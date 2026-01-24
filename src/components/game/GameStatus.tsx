@@ -1,6 +1,6 @@
 'use client';
 
-import { Game, CurrentTurn } from '@/lib/supabase/types';
+import { Game, Move, CurrentTurn } from '@/lib/supabase/types';
 import { countAgentsFound, countTotalAgentsNeeded, getRemainingAgentsPerPlayer } from '@/lib/game/gameLogic';
 import { cn } from '@/lib/utils';
 
@@ -8,14 +8,16 @@ interface GameStatusProps {
   game: Game;
   playerRole: CurrentTurn;
   opponentName?: string;
+  currentClue?: Move | null;
+  guessCount?: number;
 }
 
-export function GameStatus({ game, playerRole, opponentName }: GameStatusProps) {
+export function GameStatus({ game, playerRole, opponentName, currentClue, guessCount = 0 }: GameStatusProps) {
   const isMyTurn = game.current_turn === playerRole;
   const agentsFound = countAgentsFound(game.board_state);
   const totalAgents = countTotalAgentsNeeded(game.key_card);
   const remaining = getRemainingAgentsPerPlayer(game);
-  const inSuddenDeath = game.timer_tokens_remaining <= 0;
+  const inSuddenDeath = game.sudden_death || game.timer_tokens <= 0;
   
   const myRemaining = playerRole === 'player1' ? remaining.player1 : remaining.player2;
   const theirRemaining = playerRole === 'player1' ? remaining.player2 : remaining.player1;
@@ -38,17 +40,12 @@ export function GameStatus({ game, playerRole, opponentName }: GameStatusProps) 
         </div>
         
         {/* Current clue */}
-        {game.current_clue && (
+        {currentClue && (
           <div className="text-center mb-3 p-2 bg-blue-50 rounded-lg">
             <p className="text-xs text-blue-600 uppercase tracking-wide">Current Clue</p>
             <p className="text-lg font-bold text-blue-900">
-              {game.current_clue.word}: {game.current_clue.number}
+              {currentClue.clue_word}: {currentClue.clue_number}
             </p>
-            {isMyTurn && (
-              <p className="text-xs text-blue-600 mt-1">
-                Guessed this turn: {game.guesses_this_turn}
-              </p>
-            )}
           </div>
         )}
         
@@ -58,12 +55,12 @@ export function GameStatus({ game, playerRole, opponentName }: GameStatusProps) 
           <div className="flex items-center gap-1">
             <span className="text-stone-500">Tokens:</span>
             <div className="flex gap-0.5">
-              {Array.from({ length: game.timer_tokens }).map((_, i) => (
+              {Array.from({ length: 9 }).map((_, i) => (
                 <div
                   key={i}
                   className={cn(
                     'w-3 h-3 rounded-full',
-                    i < game.timer_tokens_remaining
+                    i < game.timer_tokens
                       ? 'bg-amber-500'
                       : 'bg-stone-200'
                   )}

@@ -11,6 +11,8 @@ interface GameActionsProps {
   player1Name: string;
   player2Name: string;
   onEndTurn: () => void;
+  hasActiveClue?: boolean;
+  guessCount?: number;
 }
 
 export function GameActions({ 
@@ -18,14 +20,18 @@ export function GameActions({
   playerRole, 
   player1Name, 
   player2Name,
-  onEndTurn 
+  onEndTurn,
+  hasActiveClue = false,
+  guessCount = 0
 }: GameActionsProps) {
   const { moves } = useGameStore();
   
   const isMyTurn = game.current_turn === playerRole;
-  const hasActiveClue = !!game.current_clue;
-  const isGuessing = isMyTurn && hasActiveClue;
-  const canEndTurn = isGuessing && game.guesses_this_turn > 0;
+  const isGuessPhase = game.current_phase === 'guess';
+  const isGuessing = !isMyTurn && isGuessPhase; // Guesser is opposite of current turn holder
+  const isClueGiver = isMyTurn && game.current_phase === 'clue';
+  
+  const canEndTurn = isGuessing && guessCount > 0;
   
   return (
     <div className="bg-white border-t p-3">
@@ -35,6 +41,7 @@ export function GameActions({
           playerRole={playerRole}
           player1Name={player1Name}
           player2Name={player2Name}
+          words={game.words}
         />
         
         {canEndTurn && (
@@ -47,13 +54,13 @@ export function GameActions({
           </Button>
         )}
         
-        {isMyTurn && !hasActiveClue && (
+        {isClueGiver && (
           <div className="text-sm text-stone-500 italic">
             Select words & give clue below
           </div>
         )}
         
-        {!isMyTurn && (
+        {!isMyTurn && !isGuessing && (
           <div className="text-sm text-stone-500 italic">
             Waiting for opponent...
           </div>

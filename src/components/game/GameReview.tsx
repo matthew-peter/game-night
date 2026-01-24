@@ -18,15 +18,16 @@ interface GameReviewProps {
 }
 
 export function GameReview({ game, moves, playerRole, player1Name, player2Name }: GameReviewProps) {
+  const words = game.words; // For mapping indices to words
   const agentsFound = countAgentsFound(game.board_state);
   const totalAgents = countTotalAgentsNeeded(game.key_card);
   const assassinHit = checkAssassinHit(game.board_state);
-  const won = game.winner !== null && !assassinHit && agentsFound >= totalAgents;
+  const won = game.result === 'win';
   
   // Calculate stats
   const totalGuesses = moves.filter(m => m.move_type === 'guess').length;
-  const correctGuesses = moves.filter(m => m.move_type === 'guess' && m.result === 'agent').length;
-  const wrongGuesses = moves.filter(m => m.move_type === 'guess' && m.result === 'bystander').length;
+  const correctGuesses = moves.filter(m => m.move_type === 'guess' && m.guess_result === 'agent').length;
+  const wrongGuesses = moves.filter(m => m.move_type === 'guess' && m.guess_result === 'bystander').length;
   const totalClues = moves.filter(m => m.move_type === 'clue').length;
   
   return (
@@ -184,7 +185,7 @@ export function GameReview({ game, moves, playerRole, player1Name, player2Name }
                         <span className="font-semibold">{move.clue_word}: {move.clue_number}</span>
                         {move.intended_words && move.intended_words.length > 0 && (
                           <span className="text-stone-500 ml-2">
-                            (for: {move.intended_words.join(', ')})
+                            (for: {move.intended_words.map(i => words[i]).join(', ')})
                           </span>
                         )}
                       </>
@@ -194,16 +195,16 @@ export function GameReview({ game, moves, playerRole, player1Name, player2Name }
                         <span>Guessed </span>
                         <span className={cn(
                           'font-semibold',
-                          move.result === 'agent' && 'text-green-600',
-                          move.result === 'bystander' && 'text-amber-600',
-                          move.result === 'assassin' && 'text-red-600'
+                          move.guess_result === 'agent' && 'text-green-600',
+                          move.guess_result === 'bystander' && 'text-amber-600',
+                          move.guess_result === 'assassin' && 'text-red-600'
                         )}>
-                          {move.guessed_word}
+                          {move.guess_index !== null && move.guess_index !== undefined ? words[move.guess_index] : 'Unknown'}
                         </span>
                         <span className="ml-1">
-                          {move.result === 'agent' && '✓'}
-                          {move.result === 'bystander' && '○'}
-                          {move.result === 'assassin' && '☠'}
+                          {move.guess_result === 'agent' && '✓'}
+                          {move.guess_result === 'bystander' && '○'}
+                          {move.guess_result === 'assassin' && '☠'}
                         </span>
                       </>
                     )}

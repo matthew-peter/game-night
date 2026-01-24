@@ -168,15 +168,17 @@ interface GameBoardProps {
   game: Game;
   playerRole: CurrentTurn;
   onGuess: (wordIndex: number) => void;
+  hasActiveClue?: boolean;
 }
 
-export function GameBoard({ game, playerRole, onGuess }: GameBoardProps) {
+export function GameBoard({ game, playerRole, onGuess, hasActiveClue = false }: GameBoardProps) {
   const { selectedWordsForClue, toggleWordForClue } = useGameStore();
   
   const isMyTurn = game.current_turn === playerRole;
-  const hasActiveClue = !!game.current_clue;
-  const isGivingClue = isMyTurn && !hasActiveClue && game.status === 'playing';
-  const isGuessing = isMyTurn && hasActiveClue && game.status === 'playing';
+  const isCluePhase = game.current_phase === 'clue';
+  const isGivingClue = isMyTurn && isCluePhase && game.status === 'playing';
+  // Guesser is the OTHER player during guess phase
+  const isGuessing = !isMyTurn && !isCluePhase && game.status === 'playing';
   
   return (
     <div className="w-full max-w-lg mx-auto p-2">
