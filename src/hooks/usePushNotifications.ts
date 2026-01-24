@@ -25,6 +25,7 @@ export function usePushNotifications() {
   const [subscription, setSubscription] = useState<PushSubscription | null>(null);
   const [isSupported, setIsSupported] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
     // Check if push notifications are supported
@@ -38,8 +39,13 @@ export function usePushNotifications() {
       navigator.serviceWorker.ready.then(registration => {
         registration.pushManager.getSubscription().then(sub => {
           setSubscription(sub);
+          setIsChecking(false);
         });
+      }).catch(() => {
+        setIsChecking(false);
       });
+    } else {
+      setIsChecking(false);
     }
   }, []);
 
@@ -126,6 +132,7 @@ export function usePushNotifications() {
     subscription,
     isSupported,
     isLoading,
+    isChecking,
     subscribe,
     unsubscribe,
     isSubscribed: !!subscription

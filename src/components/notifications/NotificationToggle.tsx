@@ -10,9 +10,24 @@ export function NotificationToggle() {
     isSubscribed, 
     isLoading, 
     permission,
+    isChecking,
     subscribe, 
     unsubscribe 
   } = usePushNotifications();
+
+  // Show loading state while checking support
+  if (isChecking) {
+    return (
+      <Button
+        variant="ghost"
+        size="sm"
+        disabled
+        className="text-white/50"
+      >
+        <Loader2 className="w-4 h-4 animate-spin" />
+      </Button>
+    );
+  }
 
   if (!isSupported) {
     return null; // Don't show anything if not supported
@@ -24,7 +39,7 @@ export function NotificationToggle() {
         variant="ghost"
         size="sm"
         disabled
-        className="text-gray-400"
+        className="text-white/50"
         title="Notifications blocked - enable in browser settings"
       >
         <BellOff className="w-4 h-4" />
@@ -46,7 +61,7 @@ export function NotificationToggle() {
       size="sm"
       onClick={handleClick}
       disabled={isLoading}
-      className={isSubscribed ? 'text-green-600' : 'text-gray-500'}
+      className={isSubscribed ? 'text-emerald-400' : 'text-white/70 hover:text-white'}
       title={isSubscribed ? 'Notifications enabled' : 'Enable notifications'}
     >
       {isLoading ? (
