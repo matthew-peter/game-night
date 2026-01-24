@@ -28,7 +28,8 @@ export function GameActions({
   
   const isMyTurn = game.current_turn === playerRole;
   const isGuessPhase = game.current_phase === 'guess';
-  const isGuessing = !isMyTurn && isGuessPhase; // Guesser is opposite of current turn holder
+  // Guesser: it's my turn and we're in guess phase
+  const isGuessing = isMyTurn && isGuessPhase;
   const isClueGiver = isMyTurn && game.current_phase === 'clue';
   
   const canEndTurn = isGuessing && guessCount > 0;

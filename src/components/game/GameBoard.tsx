@@ -176,9 +176,12 @@ export function GameBoard({ game, playerRole, onGuess, hasActiveClue = false }: 
   
   const isMyTurn = game.current_turn === playerRole;
   const isCluePhase = game.current_phase === 'clue';
+  const isGuessPhase = game.current_phase === 'guess';
+  
+  // Clue giver: it's my turn and we're in clue phase
   const isGivingClue = isMyTurn && isCluePhase && game.status === 'playing';
-  // Guesser is the OTHER player during guess phase
-  const isGuessing = !isMyTurn && !isCluePhase && game.status === 'playing';
+  // Guesser: it's my turn and we're in guess phase
+  const isGuessing = isMyTurn && isGuessPhase && game.status === 'playing';
   
   return (
     <div className="w-full max-w-lg mx-auto p-2">
