@@ -26,24 +26,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const setStoreUser = useGameStore((state) => state.setUser);
 
   useEffect(() => {
-    // Just check if there's a session, load profile separately
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        // Load profile in background, don't block
-        supabase
-          .from('users')
-          .select('*')
-          .eq('id', session.user.id)
-          .single()
-          .then(({ data }) => {
-            if (data) {
-              setUser(data);
-              setStoreUser(data);
-            }
-          });
+    let mounted = true;
+
+    // Set a timeout - if getSession takes too long, just continue
+    const timeout = setTimeout(() => {
+      if (mounted && loading) {
+        console.log('Session check timed out, continuing without session');
+        setLoading(false);
       }
-      setLoading(false);
-    });
+    }, 3000);
+
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        if (!mounted) return;
+        clearTimeout(timeout);
+        
+        if (session?.user) {
+          // Load profile in background, don't block
+          supabase
+            .from('users')
+            .select('*')
+            .eq('id', session.user.id)
+            .single()
+            .then(({ data }) => {
+              if (mounted && data) {
+                setUser(data);
+                setStoreUser(data);
+              }
+            });
+        }
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error('Session check error:', err);
+        if (mounted) {
+          clearTimeout(timeout);
+          setLoading(false);
+        }
+      });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
@@ -52,7 +72,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      clearTimeout(timeout);
+      subscription.unsubscribe();
+    };
   }, [setStoreUser]);
 
   async function signUp(email: string, password: string, username: string): Promise<{ error?: string }> {
