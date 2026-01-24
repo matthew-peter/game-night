@@ -11,10 +11,18 @@ function JoinGameContent({ pin }: { pin: string }) {
   const router = useRouter();
   const supabase = createClient();
 
+  console.log('JoinGameContent render:', { user: user?.username, loading, pin });
+
   useEffect(() => {
-    if (loading) return;
+    console.log('JoinGameContent useEffect:', { loading, hasUser: !!user });
+    
+    if (loading) {
+      console.log('Still loading auth...');
+      return;
+    }
 
     if (!user) {
+      console.log('No user, redirecting to login');
       // Store the pin and redirect to login
       sessionStorage.setItem('pendingGamePin', pin);
       router.push('/');
@@ -22,7 +30,7 @@ function JoinGameContent({ pin }: { pin: string }) {
     }
 
     const joinGame = async () => {
-      console.log('Joining game with PIN:', pin.toUpperCase());
+      console.log('Joining game with PIN:', pin.toUpperCase(), 'User:', user.id);
       
       // Find game by PIN (uppercase to match)
       const { data: game, error: fetchError } = await supabase
@@ -31,7 +39,7 @@ function JoinGameContent({ pin }: { pin: string }) {
         .eq('pin', pin.toUpperCase())
         .single();
 
-      console.log('Game lookup result:', { game, fetchError });
+      console.log('Game lookup result:', { game: game?.id, fetchError });
 
       if (fetchError || !game) {
         console.error('Game not found:', fetchError);

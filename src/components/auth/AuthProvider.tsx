@@ -25,24 +25,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Check for existing session
     const checkUser = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        console.log('AuthProvider: Checking session...');
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error('AuthProvider: Session error:', sessionError);
+          setLoading(false);
+          return;
+        }
+        
+        console.log('AuthProvider: Session:', session?.user?.id || 'none');
         
         if (session?.user) {
           // Get user profile from our users table
-          const { data: profile } = await supabase
+          const { data: profile, error: profileError } = await supabase
             .from('users')
             .select('*')
             .eq('id', session.user.id)
             .single();
           
+          if (profileError) {
+            console.error('AuthProvider: Profile error:', profileError);
+          }
+          
           if (profile) {
+            console.log('AuthProvider: User profile loaded:', profile.username);
             setUser(profile);
             setStoreUser(profile);
+          } else {
+            console.log('AuthProvider: No profile found for user');
           }
         }
       } catch (error) {
-        console.error('Error checking user:', error);
+        console.error('AuthProvider: Error checking user:', error);
       } finally {
+        console.log('AuthProvider: Setting loading to false');
         setLoading(false);
       }
     };
