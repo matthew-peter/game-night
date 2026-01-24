@@ -34,6 +34,7 @@ function DashboardContent() {
   // Game creation settings
   const [timerTokens, setTimerTokens] = useState(9);
   const [clueStrictness, setClueStrictness] = useState<ClueStrictness>('strict');
+  const [firstClueGiver, setFirstClueGiver] = useState<'creator' | 'joiner'>('creator');
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   // Fetch active games
@@ -131,6 +132,7 @@ function DashboardContent() {
       const pin = generatePin();
       
       // Match the actual database schema
+      // current_turn represents who gives the first clue
       const newGame = {
         id: crypto.randomUUID(),
         pin,
@@ -142,7 +144,7 @@ function DashboardContent() {
         board_state: { revealed: {} },
         timer_tokens: timerTokens,
         clue_strictness: clueStrictness,
-        current_turn: 'player1',
+        current_turn: firstClueGiver === 'creator' ? 'player1' : 'player2',
         current_phase: 'clue',
         player1_agents_found: 0,
         player2_agents_found: 0,
@@ -380,6 +382,27 @@ function DashboardContent() {
                         </SelectItem>
                         <SelectItem value="very_strict">
                           Very Strict - No shared word roots
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {/* First clue giver */}
+                  <div className="space-y-2">
+                    <Label>Who gives the first clue?</Label>
+                    <Select
+                      value={firstClueGiver}
+                      onValueChange={(v) => setFirstClueGiver(v as 'creator' | 'joiner')}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="creator">
+                          Me (game creator)
+                        </SelectItem>
+                        <SelectItem value="joiner">
+                          My partner (who joins)
                         </SelectItem>
                       </SelectContent>
                     </Select>

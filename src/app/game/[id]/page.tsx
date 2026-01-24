@@ -256,9 +256,11 @@ function GamePageContent({ gameId }: { gameId: string }) {
         toast.error('Time ran out!');
       }
     } else if (result.turnEnds) {
-      // Bystander hit, turn ends, lose a token
+      // Bystander hit, guessing ends, guesser now becomes the clue giver
+      // The guesser is the one who is NOT current_turn (since current_turn = clue giver)
+      // So now the guesser (me, playerRole) becomes the clue giver
       const newTokens = game.timer_tokens - 1;
-      updates.current_turn = getNextTurn(game.current_turn);
+      updates.current_turn = playerRole; // I was guessing, now I give clue
       updates.current_phase = 'clue';
       updates.timer_tokens = newTokens;
       
@@ -266,17 +268,8 @@ function GamePageContent({ gameId }: { gameId: string }) {
         updates.sudden_death = true;
       }
       
-      // Notify opponent it's their turn to give a clue
-      if (opponent) {
-        await sendTurnNotification(
-          game.id,
-          opponent.id,
-          user.username,
-          `${user.username} hit a bystander - Your turn to give a clue!`
-        );
-      }
-      
-      toast.info('Bystander! Turn over.');
+      // No notification needed - it's MY turn now to give a clue
+      toast.info('Bystander! Your turn to give a clue.');
     } else {
       // Correct guess
       toast.success(`✓ ${word} is an agent!`);
@@ -304,10 +297,11 @@ function GamePageContent({ gameId }: { gameId: string }) {
       move_type: 'end_turn',
     });
 
-    // Update game - end turn consumes a token
+    // Update game - guesser ends turn, becomes next clue giver
+    // I was guessing (not the current_turn/clue giver), now I become clue giver
     const newTokens = game.timer_tokens - 1;
     const updates: Record<string, unknown> = {
-      current_turn: getNextTurn(game.current_turn),
+      current_turn: playerRole, // I was guessing, now I give clue
       current_phase: 'clue',
       timer_tokens: newTokens,
     };
@@ -324,16 +318,8 @@ function GamePageContent({ gameId }: { gameId: string }) {
     if (error) {
       toast.error('Failed to end turn');
     } else {
-      // Notify opponent it's their turn
-      if (opponent) {
-        await sendTurnNotification(
-          game.id,
-          opponent.id,
-          user.username,
-          `${user.username} ended their turn - Your turn to give a clue!`
-        );
-      }
-      toast.info('Turn ended');
+      // No notification - it's MY turn now to give a clue
+      toast.info('Your turn to give a clue!');
     }
   }, [game, user, playerRole, supabase, opponent]);
 
