@@ -124,13 +124,15 @@ export function getRemainingAgentsPerPlayer(game: Game): {
     const wordIndex = game.words.indexOf(word);
     if (wordIndex !== -1) {
       revealedIndices.add(wordIndex);
+    } else {
+      // Debug: word not found in game.words array
+      console.warn('Word not found in game.words:', word, 'Available words:', game.words);
     }
   }
   
   // Count remaining agents for each player
-  // An agent is "remaining" if it's in the player's agents list AND hasn't been revealed yet
-  // Note: We don't care HOW it was revealed - if a shared agent is guessed by either player,
-  // it counts as found for both
+  // remaining.player1 = unrevealed agents on player1's key = light green on player1's board
+  // This is what player2 needs to guess
   const player1Remaining = game.key_card.player1.agents.filter(
     idx => !revealedIndices.has(idx)
   ).length;
@@ -138,6 +140,14 @@ export function getRemainingAgentsPerPlayer(game: Game): {
   const player2Remaining = game.key_card.player2.agents.filter(
     idx => !revealedIndices.has(idx)
   ).length;
+  
+  console.log('getRemainingAgentsPerPlayer:', {
+    player1Agents: game.key_card.player1.agents,
+    player2Agents: game.key_card.player2.agents,
+    revealedIndices: Array.from(revealedIndices),
+    player1Remaining,
+    player2Remaining
+  });
   
   return { 
     player1: player1Remaining, 
