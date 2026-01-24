@@ -114,7 +114,7 @@ function WordCard({
     longPressTimer.current = setTimeout(() => {
       isLongPress.current = true;
       setShowDefinition(true);
-    }, 500);
+    }, 2000); // 2 second long press for dictionary
   }, []);
   
   const handleTouchEnd = useCallback(() => {
@@ -150,12 +150,12 @@ function WordCard({
     <>
       <button
         className={cn(
-          'relative w-full aspect-[3/4] rounded-xl border-2 flex flex-col items-center justify-between overflow-hidden',
-          'transition-all duration-200 ease-out',
-          'touch-manipulation select-none shadow-md hover:shadow-lg',
+          'relative w-full aspect-square rounded-lg border-2 flex items-center justify-center overflow-hidden',
+          'transition-all duration-150',
+          'touch-manipulation select-none',
           styles.card,
           selectionStyles,
-          !isRevealed && (isGivingClue || isGuessing) && 'active:scale-95 cursor-pointer hover:scale-102',
+          !isRevealed && (isGivingClue || isGuessing) && 'active:scale-95 cursor-pointer',
         )}
         onClick={handleClick}
         onTouchStart={handleTouchStart}
@@ -163,71 +163,27 @@ function WordCard({
         onContextMenu={handleContextMenu}
         disabled={isRevealed && !showDefinition}
       >
-        {/* Card illustration area */}
-        <div className="flex-1 w-full flex items-center justify-center p-2">
-          {isRevealed ? (
-            <div className="flex flex-col items-center gap-1">
-              {styles.icon}
-              {revealed.type === 'agent' && (
-                <span className="text-[10px] font-bold text-white/70 uppercase tracking-wider">Agent</span>
-              )}
-              {revealed.type === 'assassin' && (
-                <span className="text-[10px] font-bold text-white uppercase tracking-wider">ASSASSIN</span>
-              )}
-              {revealed.type === 'bystander' && (
-                <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">BYSTANDER</span>
-              )}
-            </div>
-          ) : (
-            // Show card type indicator for clue giver
-            <div className="w-full h-full flex items-center justify-center">
-              {cardTypeForMe === 'agent' && (
-                <div className="text-center">
-                  <User className="w-8 h-8 text-green-600 mx-auto opacity-50" />
-                  <span className="text-[9px] font-bold text-green-700 opacity-60">AGENT</span>
-                </div>
-              )}
-              {cardTypeForMe === 'assassin' && (
-                <div className="text-center">
-                  <Skull className="w-8 h-8 text-stone-700 mx-auto opacity-50" />
-                  <span className="text-[9px] font-bold text-stone-800 opacity-60">ASSASSIN</span>
-                </div>
-              )}
-              {cardTypeForMe === 'bystander' && (
-                <div className="text-center">
-                  <Eye className="w-8 h-8 text-amber-500 mx-auto opacity-40" />
-                  <span className="text-[9px] font-bold text-amber-600 opacity-50">BYSTANDER</span>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-        
-        {/* Word label at bottom */}
-        <div className={cn(
-          'w-full py-2 px-1 text-center',
-          styles.label,
-          'text-[9px] sm:text-[11px] font-black uppercase tracking-tight leading-tight'
+        {/* Word - always visible */}
+        <span className={cn(
+          'text-[11px] font-bold uppercase text-center leading-tight px-0.5',
+          styles.text
         )}>
           {word}
-        </div>
+        </span>
         
-        {/* Who guessed indicator */}
+        {/* Revealed overlay icon */}
         {isRevealed && (
-          <div className={cn(
-            'absolute top-1 right-1 text-[8px] font-bold px-1.5 py-0.5 rounded',
-            revealed.type === 'agent' ? 'bg-green-800 text-white' : 
-            revealed.type === 'assassin' ? 'bg-red-600 text-white' : 
-            'bg-amber-600 text-white'
-          )}>
-            {revealed.guessedBy === 'player1' ? 'P1' : 'P2'}
+          <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+            {revealed.type === 'agent' && <User className="w-6 h-6 text-white drop-shadow" />}
+            {revealed.type === 'assassin' && <Skull className="w-6 h-6 text-white drop-shadow" />}
+            {revealed.type === 'bystander' && <Eye className="w-6 h-6 text-amber-800 drop-shadow" />}
           </div>
         )}
         
         {/* Selection checkmark */}
         {isSelected && !isRevealed && (
-          <div className="absolute top-1 left-1 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center shadow-lg">
-            <span className="text-white text-sm font-bold">✓</span>
+          <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-blue-600 rounded-full flex items-center justify-center">
+            <span className="text-white text-[10px] font-bold">✓</span>
           </div>
         )}
       </button>
@@ -262,8 +218,8 @@ export function GameBoard({ game, playerRole, onGuess, hasActiveClue = false }: 
   const isGuessing = isMyTurn && isGuessPhase && game.status === 'playing';
   
   return (
-    <div className="w-full max-w-lg mx-auto p-2">
-      <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
+    <div className="w-full max-w-md mx-auto px-1">
+      <div className="grid grid-cols-5 gap-1">
         {game.words.map((word, index) => (
           <WordCard
             key={`${word}-${index}`}
