@@ -114,8 +114,12 @@ function GamePageContent({ gameId }: { gameId: string }) {
         },
         (payload) => {
           console.log('Game update received:', payload);
+          console.log('New board_state:', payload.new?.board_state);
           const updatedGame = payload.new as Game;
           setGame(updatedGame);
+          
+          // If board state changed (someone guessed), the UI will update
+          // The game prop flows to GameBoard which reads board_state.revealed
         }
       )
       .on(
@@ -149,9 +153,27 @@ function GamePageContent({ gameId }: { gameId: string }) {
         (payload) => {
           const newMove = payload.new as Move;
           addMove(newMove);
+          
+          // If this is a guess from the OTHER player, show feedback
+          if (newMove.move_type === 'guess' && newMove.player_id !== user?.id) {
+            const wordIndex = newMove.guess_index;
+            const result = newMove.guess_result;
+            
+            // We need to get the word - fetch it from current game state
+            // The game state will also update via the game channel
+            if (result === 'agent') {
+              toast.success(`Partner found an agent! ✓`);
+            } else if (result === 'bystander') {
+              toast.info(`Partner hit a bystander`);
+            } else if (result === 'assassin') {
+              toast.error(`Partner hit the assassin! ☠`);
+            }
+          }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Moves channel status:', status);
+      });
 
     return () => {
       supabase.removeChannel(gameChannel);
