@@ -151,10 +151,13 @@ function WordCard({
       clearTimeout(longPressTimer.current);
     }
     
-    if (!isLongPress.current && !isRevealed) {
+    // Allow interaction if: not revealed, OR revealed but still my agent to clue
+    const canInteract = !isRevealed || (isStillMyAgent && isGivingClue);
+    
+    if (!isLongPress.current && canInteract) {
       if (isGivingClue) {
         onToggleSelect(word);
-      } else if (isGuessing) {
+      } else if (isGuessing && !isRevealed) {
         if (isHighlightedForGuess) {
           onConfirmGuess(index);
         } else {
@@ -162,13 +165,16 @@ function WordCard({
         }
       }
     }
-  }, [isGivingClue, isGuessing, isRevealed, isHighlightedForGuess, word, index, onToggleSelect, onHighlightForGuess, onConfirmGuess]);
+  }, [isGivingClue, isGuessing, isRevealed, isStillMyAgent, isHighlightedForGuess, word, index, onToggleSelect, onHighlightForGuess, onConfirmGuess]);
   
   const handleClick = useCallback(() => {
-    if (!isRevealed) {
+    // Allow interaction if: not revealed, OR revealed but still my agent to clue
+    const canInteract = !isRevealed || (isStillMyAgent && isGivingClue);
+    
+    if (canInteract) {
       if (isGivingClue) {
         onToggleSelect(word);
-      } else if (isGuessing) {
+      } else if (isGuessing && !isRevealed) {
         if (isHighlightedForGuess) {
           onConfirmGuess(index);
         } else {
@@ -176,7 +182,7 @@ function WordCard({
         }
       }
     }
-  }, [isGivingClue, isGuessing, isRevealed, isHighlightedForGuess, word, index, onToggleSelect, onHighlightForGuess, onConfirmGuess]);
+  }, [isGivingClue, isGuessing, isRevealed, isStillMyAgent, isHighlightedForGuess, word, index, onToggleSelect, onHighlightForGuess, onConfirmGuess]);
   
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();

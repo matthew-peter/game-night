@@ -109,23 +109,58 @@ export function processGuess(
 
 /**
  * Calculates remaining agents for each player
+ * A player's agent is "found" when it was revealed AS an agent on their key card
+ * (i.e., when the other player was guessing and it was their agent, or when this player
+ * was guessing and it happened to also be their agent)
  */
 export function getRemainingAgentsPerPlayer(game: Game): {
   player1: number;
   player2: number;
 } {
-  const revealed = Object.keys(game.board_state.revealed);
-  const revealedIndices = revealed.map(word => game.words.indexOf(word));
+  const revealed = game.board_state.revealed;
   
-  const player1Remaining = game.key_card.player1.agents.filter(
-    idx => !revealedIndices.includes(idx)
-  ).length;
+  // For each player, count how many of their agents have been revealed
+  // An agent is "found" for a player when that card index has been revealed
+  // AND it was revealed as 'agent' type (meaning the clue giver had it as agent)
+  // OR the card is in their agents list and has been revealed at all
   
-  const player2Remaining = game.key_card.player2.agents.filter(
-    idx => !revealedIndices.includes(idx)
-  ).length;
+  // Actually in Duet: your agents are found when your partner guesses them correctly
+  // Your partner gives you clues for YOUR agents (from their key, which shows your agents)
+  // So player1's remaining = player1's agents that haven't been guessed yet
   
-  return { player1: player1Remaining, player2: player2Remaining };
+  let player1Found = 0;
+  let player2Found = 0;
+  
+  for (const [word, revealInfo] of Object.entries(revealed)) {
+    const wordIndex = game.words.indexOf(word);
+    if (wordIndex === -1) continue;
+    
+    // Check if this was an agent for player1's key (meaning player2 needs to find it)
+    if (game.key_card.player1.agents.includes(wordIndex)) {
+      // Player1's agent - player2 was trying to find this
+      // It's found if it was revealed as 'agent' by player2 guessing
+      if (revealInfo.guessedBy === 'player2' && revealInfo.type === 'agent') {
+        player1Found++;
+      }
+    }
+    
+    // Check if this was an agent for player2's key (meaning player1 needs to find it)
+    if (game.key_card.player2.agents.includes(wordIndex)) {
+      // Player2's agent - player1 was trying to find this
+      // It's found if it was revealed as 'agent' by player1 guessing
+      if (revealInfo.guessedBy === 'player1' && revealInfo.type === 'agent') {
+        player2Found++;
+      }
+    }
+  }
+  
+  const player1Total = game.key_card.player1.agents.length;
+  const player2Total = game.key_card.player2.agents.length;
+  
+  return { 
+    player1: player1Total - player1Found, 
+    player2: player2Total - player2Found 
+  };
 }
 
 /**

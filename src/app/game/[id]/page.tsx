@@ -177,14 +177,25 @@ function GamePageContent({ gameId }: { gameId: string }) {
       return;
     }
 
-    // Update game state - stay on current turn, just change phase to guess
-    // The OTHER player will now guess based on this clue
+    // Deduct a timer token (each clue = 1 round)
+    const newTokens = game.timer_tokens - 1;
+    
+    const updates: Record<string, unknown> = {
+      current_phase: 'guess',
+      timer_tokens: newTokens,
+      // current_turn stays the same - it represents the clue giver
+    };
+    
+    // Check if out of tokens (sudden death)
+    if (newTokens <= 0) {
+      updates.timer_tokens = 0;
+      updates.sudden_death = true;
+    }
+
+    // Update game state
     const { error: gameError } = await supabase
       .from('games')
-      .update({
-        current_phase: 'guess',
-        // current_turn stays the same - it represents the clue giver
-      })
+      .update(updates)
       .eq('id', game.id);
 
     if (gameError) {
