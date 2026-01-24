@@ -420,7 +420,7 @@ function GamePageContent({ gameId }: { gameId: string }) {
         )}
         
         {/* Inline move history - uses remaining space */}
-        <div className="flex-1 mt-2 bg-stone-800/50 rounded-lg mx-1 min-h-[100px] max-h-[180px] overflow-hidden">
+        <div className="flex-1 mt-2 bg-stone-800/50 rounded-lg mx-1 min-h-[100px] max-h-[180px] overflow-y-auto">
           <InlineHistory
             moves={moves}
             playerRole={playerRole}

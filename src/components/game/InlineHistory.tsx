@@ -66,11 +66,10 @@ export function InlineHistory({
   }
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="px-3 py-2 space-y-2">
-        <h3 className="text-xs font-semibold text-stone-400 uppercase tracking-wide sticky top-0 bg-stone-800/90 py-1">Game Log</h3>
-        
-        <div className="space-y-2">
+    <div className="px-3 py-2 space-y-2">
+      <h3 className="text-xs font-semibold text-stone-400 uppercase tracking-wide">Game Log</h3>
+      
+      <div className="space-y-2">
           {groupedMoves.map((group, idx) => {
             const isYourClue = isCurrentUser(group.clue.player_id);
             const clueGiverName = getPlayerName(group.clue.player_id);
@@ -130,6 +129,5 @@ export function InlineHistory({
           })}
         </div>
       </div>
-    </div>
   );
 }
