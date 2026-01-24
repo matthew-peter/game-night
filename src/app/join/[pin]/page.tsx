@@ -22,14 +22,19 @@ function JoinGameContent({ pin }: { pin: string }) {
     }
 
     const joinGame = async () => {
-      // Find game by PIN
+      console.log('Joining game with PIN:', pin.toUpperCase());
+      
+      // Find game by PIN (uppercase to match)
       const { data: game, error: fetchError } = await supabase
         .from('games')
         .select('*')
-        .eq('pin', pin)
+        .eq('pin', pin.toUpperCase())
         .single();
 
+      console.log('Game lookup result:', { game, fetchError });
+
       if (fetchError || !game) {
+        console.error('Game not found:', fetchError);
         toast.error('Game not found');
         router.push('/dashboard');
         return;
@@ -57,6 +62,7 @@ function JoinGameContent({ pin }: { pin: string }) {
       }
 
       // Join as player 2
+      console.log('Attempting to join game:', game.id);
       const { error: updateError } = await supabase
         .from('games')
         .update({
@@ -66,16 +72,22 @@ function JoinGameContent({ pin }: { pin: string }) {
         .eq('id', game.id);
 
       if (updateError) {
-        toast.error('Failed to join game');
+        console.error('Failed to join game:', updateError);
+        toast.error('Failed to join game: ' + updateError.message);
         router.push('/dashboard');
         return;
       }
 
+      console.log('Successfully joined game!');
       toast.success('Joined game!');
       router.push(`/game/${game.id}`);
     };
 
-    joinGame();
+    joinGame().catch((err) => {
+      console.error('joinGame error:', err);
+      toast.error('An error occurred');
+      router.push('/dashboard');
+    });
   }, [user, loading, pin, router, supabase]);
 
   return (
