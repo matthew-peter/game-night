@@ -94,8 +94,7 @@ export function GameStatus({ game, playerRole, opponentName, currentClue, guessC
             )}
           </div>
         ) : (
-          <div className="flex justify-between text-xs text-stone-300">
-            <span>You: <span className="text-emerald-400 font-bold">{myRemaining}</span> to find</span>
+          <div className="flex justify-center text-xs text-stone-300">
             <span>{opponentName || 'They'}: <span className="text-emerald-400 font-bold">{theirRemaining}</span> to find</span>
           </div>
         )}
