@@ -73,7 +73,7 @@ export function InlineHistory({
       <h3 className="text-xs font-semibold text-stone-400 uppercase tracking-wide">Game Log</h3>
       
       <div className="space-y-2">
-          {reversedMoves.map((group, idx) => {{
+          {reversedMoves.map((group, idx) => {
             const isYourClue = isCurrentUser(group.clue.player_id);
             const clueGiverName = getPlayerName(group.clue.player_id);
             const turnNumber = groupedMoves.length - idx; // Calculate original turn number
@@ -131,7 +131,7 @@ export function InlineHistory({
               </div>
             );
           })}
-        </div>
       </div>
+    </div>
   );
 }
