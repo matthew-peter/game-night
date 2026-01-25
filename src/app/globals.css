@@ -122,4 +122,12 @@
   body {
     @apply bg-background text-foreground;
   }
+  /* Prevent iOS auto-scroll to input on focus */
+  input, textarea, select {
+    font-size: 16px; /* Prevents iOS zoom on focus */
+  }
+  /* Disable scroll anchoring that can cause jumps */
+  html {
+    overflow-anchor: none;
+  }
 }

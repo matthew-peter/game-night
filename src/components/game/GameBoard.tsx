@@ -120,8 +120,8 @@ function WordCard({
   
   const styles = getCardStyles();
   
-  // Selection state for clue giving
-  const selectionStyles = isSelected && !isRevealed 
+  // Selection state for clue giving - allow for unrevealed OR isStillMyAgent
+  const selectionStyles = isSelected && (!isRevealed || isStillMyAgent)
     ? 'ring-4 ring-blue-500 ring-offset-2 scale-105' 
     : '';
   

@@ -65,14 +65,18 @@ export function InlineHistory({
     );
   }
 
+  // Reverse to show most recent first
+  const reversedMoves = [...groupedMoves].reverse();
+  
   return (
     <div className="px-3 py-2 space-y-2">
       <h3 className="text-xs font-semibold text-stone-400 uppercase tracking-wide">Game Log</h3>
       
       <div className="space-y-2">
-          {groupedMoves.map((group, idx) => {
+          {reversedMoves.map((group, idx) => {{
             const isYourClue = isCurrentUser(group.clue.player_id);
             const clueGiverName = getPlayerName(group.clue.player_id);
+            const turnNumber = groupedMoves.length - idx; // Calculate original turn number
             
             return (
               <div
@@ -100,7 +104,7 @@ export function InlineHistory({
                       {group.clue.clue_number}
                     </span>
                   </div>
-                  <span className="text-xs text-stone-500">#{idx + 1}</span>
+                  <span className="text-xs text-stone-500">#{turnNumber}</span>
                 </div>
                 
                 {/* Guesses */}
