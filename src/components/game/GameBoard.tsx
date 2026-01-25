@@ -38,6 +38,7 @@ function WordCard({
   const [showDefinition, setShowDefinition] = useState(false);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const isLongPress = useRef(false);
+  const touchStartPos = useRef<{ x: number; y: number } | null>(null);
   
   const revealed = game.board_state.revealed[word];
   const isRevealed = !!revealed;
@@ -135,18 +136,52 @@ function WordCard({
     : '';
   
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    e.preventDefault(); // Prevent click from also firing
+    // Don't prevent default - allow scrolling
     isLongPress.current = false;
+    touchStartPos.current = {
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY,
+    };
     longPressTimer.current = setTimeout(() => {
       isLongPress.current = true;
       setShowDefinition(true);
-    }, 2000); // 2 second long press for dictionary
+    }, 1000); // 1 second long press for dictionary
+  }, []);
+  
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    // If finger moves more than 10px, cancel the long press and selection
+    if (touchStartPos.current) {
+      const dx = Math.abs(e.touches[0].clientX - touchStartPos.current.x);
+      const dy = Math.abs(e.touches[0].clientY - touchStartPos.current.y);
+      if (dx > 10 || dy > 10) {
+        if (longPressTimer.current) {
+          clearTimeout(longPressTimer.current);
+          longPressTimer.current = null;
+        }
+        touchStartPos.current = null; // Mark as cancelled scroll
+      }
+    }
   }, []);
   
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    e.preventDefault(); // Prevent click from also firing
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
+    }
+    
+    // If touchStartPos is null, user was scrolling - don't select
+    if (!touchStartPos.current) {
+      return;
+    }
+    touchStartPos.current = null;
+    
+    // If long press triggered definition, don't do anything else
+    if (isLongPress.current) {
+      return;
+    }
+    
+    // Blur any focused input to dismiss keyboard
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
     }
     
     // Allow clue selection if: not revealed, OR revealed but still my agent to clue
@@ -154,20 +189,23 @@ function WordCard({
     const canClue = !isRevealed || isStillMyAgent;
     const canGuess = !isRevealed || isStillTheirAgentToGuess;
     
-    if (!isLongPress.current) {
-      if (isGivingClue && canClue) {
-        onToggleSelect(word);
-      } else if (isGuessing && canGuess) {
-        if (isHighlightedForGuess) {
-          onConfirmGuess(index);
-        } else {
-          onHighlightForGuess(index);
-        }
+    if (isGivingClue && canClue) {
+      onToggleSelect(word);
+    } else if (isGuessing && canGuess) {
+      if (isHighlightedForGuess) {
+        onConfirmGuess(index);
+      } else {
+        onHighlightForGuess(index);
       }
     }
   }, [isGivingClue, isGuessing, isRevealed, isStillMyAgent, isStillTheirAgentToGuess, isHighlightedForGuess, word, index, onToggleSelect, onHighlightForGuess, onConfirmGuess]);
   
   const handleClick = useCallback(() => {
+    // Blur any focused input to dismiss keyboard
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+    
     // Allow clue selection if: not revealed, OR revealed but still my agent to clue
     // Allow guessing if: not revealed, OR revealed bystander that's still an agent on partner's key
     const canClue = !isRevealed || isStillMyAgent;
@@ -203,6 +241,7 @@ function WordCard({
         )}
         onClick={handleClick}
         onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onContextMenu={handleContextMenu}
         disabled={isRevealed && !showDefinition}

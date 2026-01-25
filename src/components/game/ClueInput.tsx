@@ -97,6 +97,10 @@ export function ClueInput({ game, playerRole, onGiveClue, hasActiveClue = false 
               error && 'border-red-500'
             )}
             autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            enterKeyHint="done"
           />
           <Button
             type="submit"
