@@ -39,6 +39,7 @@ function WordCard({
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const isLongPress = useRef(false);
   const touchStartPos = useRef<{ x: number; y: number } | null>(null);
+  const handledByTouch = useRef(false);
   
   const revealed = game.board_state.revealed[word];
   const isRevealed = !!revealed;
@@ -137,6 +138,7 @@ function WordCard({
   
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     // Don't prevent default - allow scrolling
+    handledByTouch.current = false;
     isLongPress.current = false;
     touchStartPos.current = {
       x: e.touches[0].clientX,
@@ -179,6 +181,9 @@ function WordCard({
       return;
     }
     
+    // Mark that we handled this via touch (prevent click from also firing)
+    handledByTouch.current = true;
+    
     // Blur any focused input to dismiss keyboard
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
@@ -201,6 +206,12 @@ function WordCard({
   }, [isGivingClue, isGuessing, isRevealed, isStillMyAgent, isStillTheirAgentToGuess, isHighlightedForGuess, word, index, onToggleSelect, onHighlightForGuess, onConfirmGuess]);
   
   const handleClick = useCallback(() => {
+    // If touch already handled this, skip
+    if (handledByTouch.current) {
+      handledByTouch.current = false;
+      return;
+    }
+    
     // Blur any focused input to dismiss keyboard
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
