@@ -1,11 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import { Game, Move, CurrentTurn } from '@/lib/supabase/types';
 import { countAgentsFound, countTotalAgentsNeeded, checkAssassinHit } from '@/lib/game/gameLogic';
 import { getCardTypeForPlayer } from '@/lib/game/keyGenerator';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 
@@ -18,7 +17,10 @@ interface GameReviewProps {
 }
 
 export function GameReview({ game, moves, playerRole, player1Name, player2Name }: GameReviewProps) {
-  const words = game.words; // For mapping indices to words
+  const [showBoard, setShowBoard] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  
+  const words = game.words;
   const agentsFound = countAgentsFound(game.board_state);
   const totalAgents = countTotalAgentsNeeded(game.key_card);
   const assassinHit = checkAssassinHit(game.board_state);
@@ -27,207 +29,183 @@ export function GameReview({ game, moves, playerRole, player1Name, player2Name }
   // Calculate stats
   const totalGuesses = moves.filter(m => m.move_type === 'guess').length;
   const correctGuesses = moves.filter(m => m.move_type === 'guess' && m.guess_result === 'agent').length;
-  const wrongGuesses = moves.filter(m => m.move_type === 'guess' && m.guess_result === 'bystander').length;
   const totalClues = moves.filter(m => m.move_type === 'clue').length;
+  const accuracy = totalGuesses > 0 ? Math.round((correctGuesses / totalGuesses) * 100) : 0;
   
   return (
-    <div className="min-h-screen bg-stone-50 p-4">
-      <div className="max-w-2xl mx-auto">
-        {/* Result header */}
-        <Card className={cn(
-          'mb-6',
-          won ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
+    <div className={cn(
+      'min-h-screen flex flex-col',
+      won ? 'bg-gradient-to-b from-emerald-900 to-emerald-950' : 'bg-gradient-to-b from-red-900 to-stone-950'
+    )}>
+      {/* Hero section - fills screen */}
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
+        {/* Result emoji */}
+        <div className="text-7xl mb-4">
+          {won ? '🎉' : (assassinHit ? '💀' : '⏱️')}
+        </div>
+        
+        {/* Result text */}
+        <h1 className={cn(
+          'text-4xl font-black uppercase tracking-tight mb-2',
+          won ? 'text-emerald-300' : 'text-red-300'
         )}>
-          <CardHeader className="text-center pb-2">
-            <CardTitle className={cn(
-              'text-3xl',
-              won ? 'text-green-700' : 'text-red-700'
-            )}>
-              {won ? '🎉 Victory!' : '💀 Game Over'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-center">
-            <p className={cn(
-              'text-lg',
-              won ? 'text-green-600' : 'text-red-600'
-            )}>
-              {won && 'You found all the agents!'}
-              {assassinHit && 'An assassin was revealed!'}
-              {!won && !assassinHit && 'Ran out of time!'}
-            </p>
-          </CardContent>
-        </Card>
+          {won ? 'Victory!' : 'Game Over'}
+        </h1>
         
-        {/* Stats */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Game Stats</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-              <div>
-                <p className="text-2xl font-bold text-green-600">{agentsFound}</p>
-                <p className="text-sm text-stone-500">Agents Found</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-stone-600">{totalClues}</p>
-                <p className="text-sm text-stone-500">Clues Given</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-blue-600">{correctGuesses}</p>
-                <p className="text-sm text-stone-500">Correct Guesses</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-amber-600">{wrongGuesses}</p>
-                <p className="text-sm text-stone-500">Wrong Guesses</p>
-              </div>
-            </div>
-            
-            {totalGuesses > 0 && (
-              <div className="mt-4 text-center">
-                <p className="text-sm text-stone-500">
-                  Accuracy: <span className="font-semibold">{Math.round((correctGuesses / totalGuesses) * 100)}%</span>
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <p className="text-white/70 text-lg mb-8">
+          {won && 'You found all the agents!'}
+          {assassinHit && 'An assassin was revealed'}
+          {!won && !assassinHit && 'Ran out of time'}
+        </p>
         
-        {/* Final board */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Final Board</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-5 gap-1">
-              {game.words.map((word, index) => {
-                const p1Type = getCardTypeForPlayer(index, game.key_card, 'player1');
-                const p2Type = getCardTypeForPlayer(index, game.key_card, 'player2');
-                const revealed = game.board_state.revealed[word];
-                
-                // Determine display color based on both keys
-                let bgColor = 'bg-stone-100';
-                if (p1Type === 'agent' || p2Type === 'agent') {
-                  bgColor = 'bg-green-400';
-                }
-                if (p1Type === 'assassin' || p2Type === 'assassin') {
-                  bgColor = 'bg-stone-800';
-                }
-                if (p1Type === 'agent' && p2Type === 'agent') {
-                  bgColor = 'bg-green-600'; // Shared agent
-                }
-                if (p1Type === 'assassin' && p2Type === 'assassin') {
-                  bgColor = 'bg-stone-950'; // Shared assassin
-                }
-                
-                return (
-                  <div
-                    key={`${word}-${index}`}
-                    className={cn(
-                      'aspect-[4/3] rounded flex items-center justify-center p-1 text-[10px] sm:text-xs font-medium uppercase',
-                      bgColor,
-                      (p1Type === 'assassin' || p2Type === 'assassin') ? 'text-white' : 'text-stone-800',
-                      revealed && 'ring-2 ring-offset-1',
-                      revealed?.type === 'agent' && 'ring-green-600',
-                      revealed?.type === 'bystander' && 'ring-amber-500',
-                      revealed?.type === 'assassin' && 'ring-red-600'
-                    )}
-                  >
-                    <span className="text-center leading-tight truncate">{word}</span>
-                  </div>
-                );
-              })}
-            </div>
-            
-            {/* Legend */}
-            <div className="mt-4 flex flex-wrap gap-2 justify-center text-xs">
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 bg-green-600 rounded" />
-                <span>Shared Agent</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 bg-green-400 rounded" />
-                <span>Agent (one side)</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 bg-stone-950 rounded" />
-                <span>Shared Assassin</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 bg-stone-800 rounded" />
-                <span>Assassin (one side)</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Quick stats */}
+        <div className="grid grid-cols-3 gap-6 mb-8 text-center">
+          <div>
+            <p className="text-3xl font-black text-white">{agentsFound}<span className="text-white/50 text-lg">/{totalAgents}</span></p>
+            <p className="text-xs text-white/50 uppercase tracking-wide">Agents</p>
+          </div>
+          <div>
+            <p className="text-3xl font-black text-white">{totalClues}</p>
+            <p className="text-xs text-white/50 uppercase tracking-wide">Clues</p>
+          </div>
+          <div>
+            <p className="text-3xl font-black text-white">{accuracy}<span className="text-white/50 text-lg">%</span></p>
+            <p className="text-xs text-white/50 uppercase tracking-wide">Accuracy</p>
+          </div>
+        </div>
         
-        {/* Move history */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Move History</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[300px]">
-              <div className="space-y-2">
-                {moves.map((move, idx) => (
-                  <div
-                    key={move.id}
-                    className={cn(
-                      'p-2 rounded text-sm',
-                      move.move_type === 'clue' && 'bg-blue-50',
-                      move.move_type === 'guess' && 'bg-stone-50',
-                      move.move_type === 'end_turn' && 'bg-stone-100'
-                    )}
-                  >
-                    <span className="text-stone-400 text-xs mr-2">#{idx + 1}</span>
-                    {move.move_type === 'clue' && (
-                      <>
-                        <span className="font-semibold">{move.clue_word}: {move.clue_number}</span>
-                        {move.intended_words && move.intended_words.length > 0 && (
-                          <span className="text-stone-500 ml-2">
-                            (for: {move.intended_words.map(i => words[i]).join(', ')})
-                          </span>
-                        )}
-                      </>
-                    )}
-                    {move.move_type === 'guess' && (
-                      <>
-                        <span>Guessed </span>
-                        <span className={cn(
-                          'font-semibold',
-                          move.guess_result === 'agent' && 'text-green-600',
-                          move.guess_result === 'bystander' && 'text-amber-600',
-                          move.guess_result === 'assassin' && 'text-red-600'
-                        )}>
-                          {move.guess_index !== null && move.guess_index !== undefined ? words[move.guess_index] : 'Unknown'}
-                        </span>
-                        <span className="ml-1">
-                          {move.guess_result === 'agent' && '✓'}
-                          {move.guess_result === 'bystander' && '○'}
-                          {move.guess_result === 'assassin' && '☠'}
-                        </span>
-                      </>
-                    )}
-                    {move.move_type === 'end_turn' && (
-                      <span className="text-stone-500 italic">Turn ended</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
+        {/* Primary action */}
+        <Link href="/dashboard" className="w-full max-w-xs mb-4">
+          <Button className={cn(
+            'w-full h-14 text-lg font-bold rounded-xl shadow-lg',
+            won 
+              ? 'bg-emerald-500 hover:bg-emerald-400 text-emerald-950' 
+              : 'bg-white hover:bg-stone-100 text-stone-900'
+          )}>
+            Play Again
+          </Button>
+        </Link>
         
-        {/* Actions */}
-        <div className="flex justify-center gap-4">
-          <Link href="/dashboard">
-            <Button variant="outline">Back to Dashboard</Button>
-          </Link>
-          <Link href="/dashboard">
-            <Button className="bg-green-600 hover:bg-green-700">Play Again</Button>
-          </Link>
+        {/* Secondary actions */}
+        <div className="flex gap-3">
+          <Button 
+            variant="ghost" 
+            className="text-white/60 hover:text-white hover:bg-white/10"
+            onClick={() => setShowBoard(!showBoard)}
+          >
+            {showBoard ? 'Hide Board' : 'View Board'}
+          </Button>
+          <Button 
+            variant="ghost" 
+            className="text-white/60 hover:text-white hover:bg-white/10"
+            onClick={() => setShowHistory(!showHistory)}
+          >
+            {showHistory ? 'Hide History' : 'View History'}
+          </Button>
         </div>
       </div>
+      
+      {/* Expandable sections */}
+      {showBoard && (
+        <div className="bg-black/30 px-4 py-6">
+          <h3 className="text-white/70 text-sm font-semibold uppercase tracking-wide mb-3 text-center">Final Board</h3>
+          <div className="grid grid-cols-5 gap-1 max-w-sm mx-auto">
+            {game.words.map((word, index) => {
+              const p1Type = getCardTypeForPlayer(index, game.key_card, 'player1');
+              const p2Type = getCardTypeForPlayer(index, game.key_card, 'player2');
+              const revealed = game.board_state.revealed[word];
+              
+              // Determine display color based on both keys
+              let bgColor = 'bg-amber-100';
+              let textColor = 'text-stone-700';
+              
+              if (p1Type === 'agent' && p2Type === 'agent') {
+                bgColor = 'bg-emerald-500';
+                textColor = 'text-white';
+              } else if (p1Type === 'agent' || p2Type === 'agent') {
+                bgColor = 'bg-emerald-300';
+                textColor = 'text-emerald-900';
+              }
+              
+              if (p1Type === 'assassin' && p2Type === 'assassin') {
+                bgColor = 'bg-stone-900';
+                textColor = 'text-white';
+              } else if (p1Type === 'assassin' || p2Type === 'assassin') {
+                bgColor = 'bg-stone-700';
+                textColor = 'text-white';
+              }
+              
+              return (
+                <div
+                  key={`${word}-${index}`}
+                  className={cn(
+                    'aspect-square rounded flex items-center justify-center p-0.5',
+                    bgColor,
+                    textColor,
+                    revealed && 'ring-2 ring-white/50'
+                  )}
+                >
+                  <span className="text-[8px] font-bold uppercase text-center leading-tight">{word}</span>
+                </div>
+              );
+            })}
+          </div>
+          
+          {/* Legend */}
+          <div className="mt-3 flex flex-wrap gap-3 justify-center text-[10px] text-white/60">
+            <span className="flex items-center gap-1"><span className="w-2 h-2 bg-emerald-500 rounded-sm"/> Shared</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 bg-emerald-300 rounded-sm"/> Agent</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 bg-stone-700 rounded-sm"/> Assassin</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 ring-2 ring-white/50 rounded-sm"/> Revealed</span>
+          </div>
+        </div>
+      )}
+      
+      {showHistory && (
+        <div className="bg-black/30 px-4 py-6 max-h-[50vh] overflow-y-auto">
+          <h3 className="text-white/70 text-sm font-semibold uppercase tracking-wide mb-3 text-center">Move History</h3>
+          <div className="space-y-1 max-w-sm mx-auto">
+            {moves.map((move) => (
+              <div
+                key={move.id}
+                className={cn(
+                  'px-3 py-2 rounded text-sm',
+                  move.move_type === 'clue' && 'bg-blue-500/20 text-blue-200',
+                  move.move_type === 'guess' && 'bg-white/10 text-white/80',
+                  move.move_type === 'end_turn' && 'bg-white/5 text-white/40'
+                )}
+              >
+                {move.move_type === 'clue' && (
+                  <span>
+                    <span className="font-bold">{move.clue_word?.toUpperCase()}</span>
+                    <span className="text-amber-400 ml-1">{move.clue_number}</span>
+                  </span>
+                )}
+                {move.move_type === 'guess' && (
+                  <span className="flex items-center gap-2">
+                    <span className={cn(
+                      'font-medium',
+                      move.guess_result === 'agent' && 'text-emerald-400',
+                      move.guess_result === 'bystander' && 'text-amber-400',
+                      move.guess_result === 'assassin' && 'text-red-400'
+                    )}>
+                      {move.guess_index !== null && move.guess_index !== undefined ? words[move.guess_index] : '?'}
+                    </span>
+                    <span className="text-xs">
+                      {move.guess_result === 'agent' && '✓'}
+                      {move.guess_result === 'bystander' && '○'}
+                      {move.guess_result === 'assassin' && '☠'}
+                    </span>
+                  </span>
+                )}
+                {move.move_type === 'end_turn' && (
+                  <span className="italic text-xs">Pass</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
