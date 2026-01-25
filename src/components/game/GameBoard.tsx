@@ -283,11 +283,11 @@ function WordCard({
           </div>
         )}
         
-        {/* Highlight for guess - tap again prompt */}
+        {/* Highlight for guess - tap again prompt at bottom, word stays visible */}
         {isHighlightedForGuess && !isRevealed && (
-          <div className="absolute inset-0 flex items-center justify-center bg-amber-500/40 rounded-lg">
-            <span className="text-[8px] font-bold text-amber-900 bg-white/90 px-1 py-0.5 rounded shadow">
-              TAP AGAIN
+          <div className="absolute bottom-0 left-0 right-0 bg-amber-500 py-0.5 rounded-b-lg">
+            <span className="text-[7px] font-bold text-amber-900 uppercase">
+              Tap to guess
             </span>
           </div>
         )}
