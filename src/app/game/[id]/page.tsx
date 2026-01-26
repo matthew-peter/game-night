@@ -319,12 +319,18 @@ function GamePageContent({ gameId }: { gameId: string }) {
         updates.result = 'loss';
       }
     } else if (result.turnEnds) {
-      // Bystander hit, guessing ends, guesser now becomes the clue giver
-      // Token already deducted when clue was given
-      updates.current_turn = playerRole; // I was guessing, now I give clue
-      updates.current_phase = 'clue';
-      
-      // Bystander hit - turn ends, now I give clue
+      // Bystander hit
+      if (game.timer_tokens <= 0 || game.sudden_death) {
+        // In sudden death mode - bystander hit = game over
+        updates.status = 'completed';
+        updates.ended_at = new Date().toISOString();
+        updates.result = 'loss';
+      } else {
+        // Normal mode - guesser now becomes the clue giver
+        // Token already deducted when clue was given
+        updates.current_turn = playerRole; // I was guessing, now I give clue
+        updates.current_phase = 'clue';
+      }
     } else {
       // Correct guess - keep guessing
     }
@@ -353,9 +359,11 @@ function GamePageContent({ gameId }: { gameId: string }) {
 
     // Update game - guesser ends turn, becomes next clue giver
     // Token already deducted when clue was given
+    // But in sudden death, we stay in guess phase and switch guesser
+    const inSuddenDeath = game.timer_tokens <= 0 || game.sudden_death;
     const updates: Record<string, unknown> = {
-      current_turn: playerRole, // I was guessing, now I give clue
-      current_phase: 'clue',
+      current_turn: playerRole, // I was guessing, now I give clue (or partner guesses in sudden death)
+      current_phase: inSuddenDeath ? 'guess' : 'clue',
     };
     
     const { error } = await supabase
@@ -368,7 +376,7 @@ function GamePageContent({ gameId }: { gameId: string }) {
     }
   }, [game, user, playerRole, supabase, opponent]);
 
-  // Auto-skip clue phase if current clue giver has no agents left to clue about
+  // Auto-skip clue phase if in sudden death OR clue giver has no agents left
   useEffect(() => {
     if (!game || !user || !playerRole || game.status !== 'playing') return;
     if (game.current_phase !== 'clue') return;
@@ -376,12 +384,30 @@ function GamePageContent({ gameId }: { gameId: string }) {
     // Only the current clue giver should trigger the skip
     if (game.current_turn !== playerRole) return;
     
+    const inSuddenDeath = game.timer_tokens <= 0 || game.sudden_death;
+    
     // Check if I have any agents left on my key for partner to guess
     const remaining = getRemainingAgentsPerPlayer(game);
     const myRemaining = playerRole === 'player1' ? remaining.player1 : remaining.player2;
     
-    if (myRemaining === 0) {
-      // I have no agents left - auto-pass to partner
+    // In sudden death: switch to guess phase, other player guesses
+    // No agents left: pass to partner to give clue (unless also sudden death)
+    if (inSuddenDeath) {
+      // Sudden death - no clues allowed, switch to guess phase
+      const autoSkipToGuess = async () => {
+        const otherPlayer = playerRole === 'player1' ? 'player2' : 'player1';
+        await supabase
+          .from('games')
+          .update({
+            current_turn: otherPlayer, // Other player guesses
+            current_phase: 'guess',
+          })
+          .eq('id', game.id);
+      };
+      
+      autoSkipToGuess();
+    } else if (myRemaining === 0) {
+      // I have no agents left - auto-pass to partner to give clue
       const autoSkip = async () => {
         // Create a "pass" move
         await supabase.from('moves').insert({
@@ -468,8 +494,8 @@ function GamePageContent({ gameId }: { gameId: string }) {
           hasActiveClue={hasActiveClue}
         />
         
-        {/* Clue input - right below the board */}
-        {isMyTurn && game.current_phase === 'clue' && (
+        {/* Clue input - right below the board (hidden in sudden death) */}
+        {isMyTurn && game.current_phase === 'clue' && game.timer_tokens > 0 && !game.sudden_death && (
           <div className="mx-1 mt-2">
             <ClueInput
               game={game}

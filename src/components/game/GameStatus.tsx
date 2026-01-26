@@ -17,6 +17,7 @@ export function GameStatus({ game, playerRole, opponentName, currentClue, guessC
   const isClueGiver = game.current_turn === playerRole;
   const isCluePhase = game.current_phase === 'clue';
   const isGuessPhase = game.current_phase === 'guess';
+  const inSuddenDeath = game.timer_tokens <= 0 || game.sudden_death;
   
   const agentsFound = countAgentsFound(game.board_state);
   const totalAgents = countTotalAgentsNeeded(game.key_card);
@@ -34,11 +35,20 @@ export function GameStatus({ game, playerRole, opponentName, currentClue, guessC
   // - My turn to guess: I'm NOT clue giver AND phase is guess
   // - Waiting for them to give clue: I'm NOT clue giver AND phase is clue
   // - Waiting for them to guess: I'm clue giver AND phase is guess
+  // - Sudden death: only guessing allowed
   
   let statusText = '';
   let isActive = false;
   
-  if (isClueGiver) {
+  if (inSuddenDeath) {
+    // In sudden death, it's always guess phase
+    if (isGuessPhase && !isClueGiver) {
+      statusText = '💀 SUDDEN DEATH - GUESS!';
+      isActive = true;
+    } else {
+      statusText = `💀 ${opponentName || 'Partner'} guessing...`;
+    }
+  } else if (isClueGiver) {
     if (isCluePhase) {
       statusText = '⚡ GIVE A CLUE';
       isActive = true;
