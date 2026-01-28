@@ -89,16 +89,25 @@ function WordCard({
           indicatorColor: 'bg-red-900 text-white',
         };
       } else {
-        // Bystander - show who guessed it, but add green border if it's still MY agent
+        // Bystander - show who guessed it
+        // Green border if it's still MY agent (partner needs to find it)
+        // Blue border if it's still THEIR agent (I need to guess it)
+        const showGreenBorder = isStillMyAgent;
+        const showBlueBorder = isStillTheirAgentToGuess && !isStillMyAgent;
+        
         return {
-          card: isStillMyAgent 
+          card: showGreenBorder 
             ? 'bg-amber-200 border-emerald-500 border-2' // amber bg + green border = bystander that's still your agent
-            : 'bg-amber-200 border-amber-400',
+            : showBlueBorder
+              ? 'bg-amber-200 border-blue-500 border-2' // amber bg + blue border = bystander you can still guess
+              : 'bg-amber-200 border-amber-400',
           text: 'text-amber-900',
           indicator: guessedByMe ? '○ YOU' : '○ THEM',
-          indicatorColor: isStillMyAgent 
+          indicatorColor: showGreenBorder 
             ? 'bg-emerald-600 text-white' // green indicator to emphasize it's still an agent
-            : 'bg-amber-300 text-amber-800',
+            : showBlueBorder
+              ? 'bg-blue-600 text-white' // blue indicator for cards you can guess
+              : 'bg-amber-300 text-amber-800',
         };
       }
     }
