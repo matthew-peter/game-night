@@ -131,8 +131,9 @@ function WordCard({
     ? 'ring-4 ring-blue-500 ring-offset-2 scale-105' 
     : '';
   
-  // Highlight state for guessing (first tap)
-  const highlightStyles = isHighlightedForGuess && !isRevealed
+  // Highlight state for guessing (first tap) - also for bystanders that are still agents to guess
+  const canBeGuessed = !isRevealed || isStillTheirAgentToGuess;
+  const highlightStyles = isHighlightedForGuess && canBeGuessed
     ? 'ring-4 ring-amber-400 ring-offset-2 scale-105'
     : '';
   
@@ -248,14 +249,14 @@ function WordCard({
           styles.card,
           selectionStyles,
           highlightStyles,
-          !isRevealed && (isGivingClue || isGuessing) && 'active:scale-95 cursor-pointer',
+          ((!isRevealed || isStillMyAgent) && isGivingClue || canBeGuessed && isGuessing) && 'active:scale-95 cursor-pointer',
         )}
         onClick={handleClick}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onContextMenu={handleContextMenu}
-        disabled={isRevealed && !showDefinition}
+        disabled={isRevealed && !isStillTheirAgentToGuess && !isStillMyAgent && !showDefinition}
       >
         {/* Word - dynamic sizing */}
         <span className={cn(
@@ -284,7 +285,7 @@ function WordCard({
         )}
         
         {/* Highlight for guess - tap again prompt at bottom, word stays visible */}
-        {isHighlightedForGuess && !isRevealed && (
+        {isHighlightedForGuess && canBeGuessed && (
           <div className="absolute bottom-0 left-0 right-0 bg-amber-500 py-0.5 rounded-b-lg">
             <span className="text-[7px] font-bold text-amber-900 uppercase">
               Tap to guess
