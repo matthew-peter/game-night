@@ -131,3 +131,26 @@
     overflow-anchor: none;
   }
 }
+
+/* Reaction animation */
+@keyframes reaction-pop {
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  20% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+  40% {
+    transform: scale(1);
+  }
+  100% {
+    transform: scale(1.5) translateY(-50px);
+    opacity: 0;
+  }
+}
+
+.animate-reaction {
+  animation: reaction-pop 2.5s ease-out forwards;
+}
