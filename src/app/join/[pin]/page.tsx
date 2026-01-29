@@ -86,6 +86,22 @@ function JoinGameContent({ pin }: { pin: string }) {
         return;
       }
 
+      // Notify player1 that someone joined
+      try {
+        await fetch('/api/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            gameId: game.id,
+            userId: game.player1_id,
+            message: `${user.username || 'A player'} joined your game! Let's play!`,
+            title: 'Player Joined!'
+          }),
+        });
+      } catch (e) {
+        console.error('Failed to send join notification:', e);
+      }
+
       console.log('Successfully joined game!');
       toast.success('Joined game!');
       router.push(`/game/${game.id}`);

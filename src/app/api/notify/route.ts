@@ -11,7 +11,7 @@ webpush.setVapidDetails(
 
 export async function POST(request: NextRequest) {
   try {
-    const { gameId, userId, opponentName, message } = await request.json();
+    const { gameId, userId, opponentName, message, title } = await request.json();
 
     if (!gameId || !userId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     // Create admin client to access push subscriptions
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
 
     // Get the user's push subscription
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
     const payload = JSON.stringify({
-      title: "It's your turn!",
+      title: title || "It's your turn!",
       body: message || `${opponentName || 'Your opponent'} made a move`,
       url: `${appUrl}/game/${gameId}`,
       gameId: gameId
