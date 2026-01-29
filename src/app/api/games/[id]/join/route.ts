@@ -60,8 +60,12 @@ export async function POST(
 
     // Notify player1 that someone joined
     try {
-      // Configure web-push
-      if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+      // Check env vars
+      if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
+        console.log('JOIN NOTIFY: Missing VAPID keys');
+      } else if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        console.log('JOIN NOTIFY: Missing SUPABASE_SERVICE_ROLE_KEY');
+      } else {
         webpush.setVapidDetails(
           'mailto:codenames@example.com',
           process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
@@ -71,16 +75,23 @@ export async function POST(
         // Use service role key to bypass RLS and read player1's subscription
         const adminSupabase = createSupabaseClient(
           process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.SUPABASE_SERVICE_ROLE_KEY!
+          process.env.SUPABASE_SERVICE_ROLE_KEY
         );
 
-        const { data: subData } = await adminSupabase
+        console.log('JOIN NOTIFY: Looking up subscription for player1:', game.player1_id);
+        
+        const { data: subData, error: subError } = await adminSupabase
           .from('push_subscriptions')
           .select('subscription')
           .eq('user_id', game.player1_id)
           .single();
 
-        if (subData) {
+        if (subError) {
+          console.log('JOIN NOTIFY: Subscription lookup error:', subError);
+        } else if (!subData) {
+          console.log('JOIN NOTIFY: No subscription found for player1');
+        } else {
+          console.log('JOIN NOTIFY: Found subscription, sending notification');
           const subscription = JSON.parse(subData.subscription);
           const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
           const joinerName = user.user_metadata?.username || 'A player';
@@ -93,11 +104,12 @@ export async function POST(
           });
 
           await webpush.sendNotification(subscription, payload);
+          console.log('JOIN NOTIFY: Notification sent successfully');
         }
       }
     } catch (notifyError) {
       // Don't fail the join if notification fails
-      console.error('Failed to notify player1:', notifyError);
+      console.error('JOIN NOTIFY ERROR:', notifyError);
     }
 
     return NextResponse.json({ game: updatedGame });
