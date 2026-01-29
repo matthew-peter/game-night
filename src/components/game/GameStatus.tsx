@@ -4,6 +4,7 @@ import { Game, Move, CurrentTurn } from '@/lib/supabase/types';
 import { countAgentsFound, countTotalAgentsNeeded, getRemainingAgentsPerPlayer } from '@/lib/game/gameLogic';
 import { cn } from '@/lib/utils';
 import { TappableClueWord } from './TappableClueWord';
+import { Reactions } from './Reactions';
 
 interface GameStatusProps {
   game: Game;
@@ -11,9 +12,10 @@ interface GameStatusProps {
   opponentName?: string;
   currentClue?: Move | null;
   guessCount?: number;
+  userId?: string;
 }
 
-export function GameStatus({ game, playerRole, opponentName, currentClue, guessCount = 0 }: GameStatusProps) {
+export function GameStatus({ game, playerRole, opponentName, currentClue, guessCount = 0, userId }: GameStatusProps) {
   const isClueGiver = game.current_turn === playerRole;
   const isCluePhase = game.current_phase === 'clue';
   const isGuessPhase = game.current_phase === 'guess';
@@ -77,7 +79,7 @@ export function GameStatus({ game, playerRole, opponentName, currentClue, guessC
             {statusText}
           </div>
           
-          {/* Timer + Score compact */}
+          {/* Timer + Score + Reactions compact */}
           <div className="flex items-center gap-3">
             <div className="flex gap-0.5">
               {Array.from({ length: 9 }).map((_, i) => (
@@ -91,6 +93,11 @@ export function GameStatus({ game, playerRole, opponentName, currentClue, guessC
               <span className="text-emerald-400 font-bold">{agentsFound}</span>
               <span className="text-stone-400">/{totalAgents}</span>
             </div>
+            {userId && (
+              <div className="relative">
+                <Reactions gameId={game.id} playerId={userId} compact />
+              </div>
+            )}
           </div>
         </div>
         

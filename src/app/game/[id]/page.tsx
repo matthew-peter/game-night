@@ -10,7 +10,6 @@ import { ClueInput } from '@/components/game/ClueInput';
 import { GameActions } from '@/components/game/GameActions';
 import { GameReview } from '@/components/game/GameReview';
 import { InlineHistory } from '@/components/game/InlineHistory';
-import { Reactions } from '@/components/game/Reactions';
 import { useGameStore } from '@/lib/store/gameStore';
 import { createClient } from '@/lib/supabase/client';
 import { Game, Move, CurrentTurn } from '@/lib/supabase/types';
@@ -485,6 +484,7 @@ function GamePageContent({ gameId }: { gameId: string }) {
         opponentName={opponent?.username}
         currentClue={currentClue}
         guessCount={guessCount}
+        userId={user?.id}
       />
       
       <main className="flex-1 overflow-auto py-2 px-1 flex flex-col">

@@ -3,9 +3,7 @@
 import { Game, CurrentTurn } from '@/lib/supabase/types';
 import { Button } from '@/components/ui/button';
 import { ClueHistory } from './ClueHistory';
-import { Reactions } from './Reactions';
 import { useGameStore } from '@/lib/store/gameStore';
-import { useAuth } from '@/components/auth/AuthProvider';
 
 interface GameActionsProps {
   game: Game;
@@ -31,7 +29,6 @@ export function GameActions({
   guessCount = 0
 }: GameActionsProps) {
   const { moves } = useGameStore();
-  const { user } = useAuth();
   
   const isClueGiver = game.current_turn === playerRole;
   const isGuesser = game.current_turn !== playerRole;
@@ -45,9 +42,6 @@ export function GameActions({
     <div className="bg-stone-800 border-t border-stone-600 px-2 py-2">
       <div className="max-w-md mx-auto flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="relative">
-            {user && <Reactions gameId={game.id} playerId={user.id} />}
-          </div>
           <ClueHistory
             moves={moves}
             playerRole={playerRole}

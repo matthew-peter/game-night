@@ -9,6 +9,7 @@ const REACTIONS = ['👏', '🧠', '😅', '🔥', '😭', '🤞', '❤️'];
 interface ReactionsProps {
   gameId: string;
   playerId: string;
+  compact?: boolean;
 }
 
 interface IncomingReaction {
@@ -16,7 +17,7 @@ interface IncomingReaction {
   id: string;
 }
 
-export function Reactions({ gameId, playerId }: ReactionsProps) {
+export function Reactions({ gameId, playerId, compact = false }: ReactionsProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [incomingReactions, setIncomingReactions] = useState<IncomingReaction[]>([]);
   const [sendingEmoji, setSendingEmoji] = useState<string | null>(null);
@@ -69,9 +70,12 @@ export function Reactions({ gameId, playerId }: ReactionsProps) {
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          'w-10 h-10 rounded-full flex items-center justify-center text-xl',
-          'bg-stone-700 hover:bg-stone-600 active:scale-95 transition-all',
-          isOpen && 'bg-stone-600 ring-2 ring-amber-400'
+          'rounded-full flex items-center justify-center transition-all',
+          compact 
+            ? 'w-7 h-7 text-sm bg-stone-600 hover:bg-stone-500' 
+            : 'w-10 h-10 text-xl bg-stone-700 hover:bg-stone-600',
+          'active:scale-95',
+          isOpen && 'ring-2 ring-amber-400'
         )}
       >
         {sendingEmoji || '😊'}
@@ -79,12 +83,18 @@ export function Reactions({ gameId, playerId }: ReactionsProps) {
 
       {/* Reaction picker */}
       {isOpen && (
-        <div className="absolute bottom-14 left-0 bg-stone-800 rounded-xl p-2 shadow-xl border border-stone-600 flex gap-1 animate-in slide-in-from-bottom-2 duration-150">
+        <div className={cn(
+          "absolute right-0 bg-stone-800 rounded-xl p-2 shadow-xl border border-stone-600 flex gap-1 animate-in slide-in-from-top-2 duration-150 z-50",
+          compact ? "top-9" : "top-12"
+        )}>
           {REACTIONS.map((emoji) => (
             <button
               key={emoji}
               onClick={() => sendReaction(emoji)}
-              className="w-10 h-10 text-xl hover:bg-stone-700 rounded-lg active:scale-90 transition-transform"
+              className={cn(
+                "hover:bg-stone-700 rounded-lg active:scale-90 transition-transform",
+                compact ? "w-8 h-8 text-lg" : "w-10 h-10 text-xl"
+              )}
             >
               {emoji}
             </button>
