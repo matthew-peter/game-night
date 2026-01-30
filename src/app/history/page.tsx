@@ -31,13 +31,13 @@ function HistoryContent() {
     if (!user) return;
 
     const fetchGames = async () => {
-      // Fetch completed games where user was a player (must have a winner)
+      // Fetch completed games where user was a player (must have a result)
       const { data: gamesData, error } = await supabase
         .from('games')
         .select('*')
         .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
         .eq('status', 'completed')
-        .not('winner', 'is', null)
+        .not('result', 'is', null)
         .order('updated_at', { ascending: false })
         .limit(50);
 
