@@ -38,7 +38,7 @@ function HistoryContent() {
         .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
         .eq('status', 'completed')
         .not('result', 'is', null)
-        .order('updated_at', { ascending: false })
+        .order('ended_at', { ascending: false, nullsFirst: false })
         .limit(50);
 
       if (error) {
