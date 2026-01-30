@@ -304,13 +304,11 @@ function DashboardContent() {
         {/* Active Games */}
         {(loadingGames || activeGames.length > 0) && (
           <Card className="mb-3 border-emerald-200 bg-emerald-50/50">
-            <CardHeader className="pb-1 pt-3 px-4">
-              <CardTitle className="flex items-center gap-2 text-base">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-2 mb-2">
                 <Play className="h-4 w-4 text-emerald-600" />
-                Active Games
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="px-4 pb-3">
+                <span className="font-medium">Active Games</span>
+              </div>
               {loadingGames ? (
                 <div className="flex items-center justify-center py-4">
                   <Loader2 className="h-5 w-5 animate-spin text-emerald-600" />
@@ -394,23 +392,19 @@ function DashboardContent() {
         
         {/* Create Game */}
         <Card className="mb-3">
-          <CardHeader className="pb-2 pt-3 px-4">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Plus className="h-4 w-4 text-green-600" />
-              Create New Game
-            </CardTitle>
-            <CardDescription className="text-sm">
-              Start a new game and invite a friend
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="px-4 pb-3">
-            <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-              <DialogTrigger asChild>
-                <Button className="w-full bg-green-600 hover:bg-green-700">
-                  Create Game
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Plus className="h-4 w-4 text-green-600" />
+                <span className="font-medium">Create New Game</span>
+              </div>
+              <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+                <DialogTrigger asChild>
+                  <Button size="sm" className="bg-green-600 hover:bg-green-700">
+                    Create
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Game Settings</DialogTitle>
                   <DialogDescription>
@@ -493,38 +487,35 @@ function DashboardContent() {
                 </Button>
               </DialogContent>
             </Dialog>
+            </div>
           </CardContent>
         </Card>
         
         {/* Join Game */}
         <Card className="mb-3">
-          <CardHeader className="pb-2 pt-3 px-4">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Users className="h-4 w-4 text-blue-600" />
-              Join Game
-            </CardTitle>
-            <CardDescription className="text-sm">
-              Enter a 6-digit PIN to join
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="px-4 pb-3">
-            <form onSubmit={handleJoinGame} className="flex gap-2">
+          <CardContent className="p-3">
+            <form onSubmit={handleJoinGame} className="flex items-center gap-2">
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-blue-600" />
+                <span className="font-medium">Join Game</span>
+              </div>
               <Input
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
                 maxLength={6}
-                placeholder="Enter PIN"
+                placeholder="PIN"
                 value={joinPin}
                 onChange={(e) => setJoinPin(e.target.value.replace(/\D/g, ''))}
-                className="flex-1 text-center text-lg tracking-widest font-mono"
+                className="w-24 text-center tracking-widest font-mono"
               />
               <Button
                 type="submit"
+                size="sm"
                 disabled={joinPin.length !== 6 || joiningGame}
                 className="bg-blue-600 hover:bg-blue-700"
               >
-                {joiningGame ? 'Joining...' : 'Join'}
+                {joiningGame ? '...' : 'Join'}
               </Button>
             </form>
           </CardContent>
@@ -532,16 +523,14 @@ function DashboardContent() {
         
         {/* Game History */}
         <Card>
-          <CardHeader className="pb-2 pt-3 px-4">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <History className="h-4 w-4 text-stone-600" />
-              Recent Games
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-3">
-            <Link href="/history">
-              <Button variant="outline" size="sm" className="w-full">
-                View Game History
+          <CardContent className="p-3">
+            <Link href="/history" className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <History className="h-4 w-4 text-stone-600" />
+                <span className="font-medium">Game History</span>
+              </div>
+              <Button variant="outline" size="sm">
+                View
               </Button>
             </Link>
           </CardContent>
