@@ -296,21 +296,21 @@ function DashboardContent() {
     <div className="min-h-screen bg-stone-50">
       <Header />
       
-      <main className="max-w-lg mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold text-stone-800 mb-6">
+      <main className="max-w-lg mx-auto px-4 py-4">
+        <h1 className="text-xl font-bold text-stone-800 mb-4">
           Welcome, {user.username}!
         </h1>
 
         {/* Active Games */}
         {(loadingGames || activeGames.length > 0) && (
-          <Card className="mb-4 border-emerald-200 bg-emerald-50/50">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Play className="h-5 w-5 text-emerald-600" />
+          <Card className="mb-3 border-emerald-200 bg-emerald-50/50">
+            <CardHeader className="pb-1 pt-3 px-4">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Play className="h-4 w-4 text-emerald-600" />
                 Active Games
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-4 pb-3">
               {loadingGames ? (
                 <div className="flex items-center justify-center py-4">
                   <Loader2 className="h-5 w-5 animate-spin text-emerald-600" />
@@ -393,17 +393,17 @@ function DashboardContent() {
         )}
         
         {/* Create Game */}
-        <Card className="mb-4">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Plus className="h-5 w-5 text-green-600" />
+        <Card className="mb-3">
+          <CardHeader className="pb-2 pt-3 px-4">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Plus className="h-4 w-4 text-green-600" />
               Create New Game
             </CardTitle>
-            <CardDescription>
-              Start a new game and invite a friend to join
+            <CardDescription className="text-sm">
+              Start a new game and invite a friend
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 pb-3">
             <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
               <DialogTrigger asChild>
                 <Button className="w-full bg-green-600 hover:bg-green-700">
@@ -497,17 +497,17 @@ function DashboardContent() {
         </Card>
         
         {/* Join Game */}
-        <Card className="mb-4">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-blue-600" />
+        <Card className="mb-3">
+          <CardHeader className="pb-2 pt-3 px-4">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Users className="h-4 w-4 text-blue-600" />
               Join Game
             </CardTitle>
-            <CardDescription>
-              Enter a 6-digit PIN to join a friend&apos;s game
+            <CardDescription className="text-sm">
+              Enter a 6-digit PIN to join
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 pb-3">
             <form onSubmit={handleJoinGame} className="flex gap-2">
               <Input
                 type="text"
@@ -532,15 +532,15 @@ function DashboardContent() {
         
         {/* Game History */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <History className="h-5 w-5 text-stone-600" />
+          <CardHeader className="pb-2 pt-3 px-4">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <History className="h-4 w-4 text-stone-600" />
               Recent Games
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 pb-3">
             <Link href="/history">
-              <Button variant="outline" className="w-full">
+              <Button variant="outline" size="sm" className="w-full">
                 View Game History
               </Button>
             </Link>
