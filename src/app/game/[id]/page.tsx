@@ -453,7 +453,7 @@ function GamePageContent({ gameId }: { gameId: string }) {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="h-dvh flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
       </div>
     );
@@ -495,7 +495,7 @@ function GamePageContent({ gameId }: { gameId: string }) {
     : 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-stone-800 via-stone-700 to-stone-900 flex flex-col">
+    <div className="h-dvh bg-gradient-to-b from-stone-800 via-stone-700 to-stone-900 flex flex-col">
       <Header />
       
       <GameStatus

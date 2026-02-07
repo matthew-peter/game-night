@@ -34,7 +34,7 @@ export function GameActions({
   }
   
   return (
-    <div className="bg-stone-800 border-t border-stone-600 px-2 py-2">
+    <div className="bg-stone-800 border-t border-stone-600 px-2 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
       <div className="max-w-md mx-auto flex items-center justify-end">
         <div className="flex items-center gap-2">
           {isGuessing && (

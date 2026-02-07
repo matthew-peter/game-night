@@ -35,7 +35,7 @@ export function GameReview({ game, moves, playerRole, player1Name, player2Name }
   
   return (
     <div className={cn(
-      'min-h-screen flex flex-col',
+      'min-h-dvh flex flex-col pb-[env(safe-area-inset-bottom)]',
       won ? 'bg-gradient-to-b from-emerald-900 to-emerald-950' : 'bg-gradient-to-b from-red-900 to-stone-950'
     )}>
       {/* Hero section - fills screen */}
