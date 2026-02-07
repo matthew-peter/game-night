@@ -145,7 +145,6 @@ function WordCard({
   
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     // Don't prevent default - allow scrolling
-    handledByTouch.current = false;
     isLongPress.current = false;
     touchStartPos.current = {
       x: e.touches[0].clientX,
@@ -312,9 +311,10 @@ interface GameBoardProps {
   playerRole: CurrentTurn;
   onGuess: (wordIndex: number) => void;
   hasActiveClue?: boolean;
+  disabled?: boolean;
 }
 
-export function GameBoard({ game, playerRole, onGuess, hasActiveClue = false }: GameBoardProps) {
+export function GameBoard({ game, playerRole, onGuess, hasActiveClue = false, disabled = false }: GameBoardProps) {
   const { selectedWordsForClue, toggleWordForClue } = useGameStore();
   const [highlightedWordIndex, setHighlightedWordIndex] = useState<number | null>(null);
   
@@ -333,9 +333,10 @@ export function GameBoard({ game, playerRole, onGuess, hasActiveClue = false }: 
   }, []);
   
   const handleConfirmGuess = useCallback((wordIndex: number) => {
+    if (disabled) return;
     setHighlightedWordIndex(null);
     onGuess(wordIndex);
-  }, [onGuess]);
+  }, [onGuess, disabled]);
   
   return (
     <div className="w-full max-w-md mx-auto px-1">

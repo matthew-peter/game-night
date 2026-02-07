@@ -36,6 +36,7 @@ function GamePageContent({ gameId }: { gameId: string }) {
   
   const [loading, setLoading] = useState(true);
   const [playerRole, setPlayerRole] = useState<CurrentTurn | null>(null);
+  const [isSubmittingGuess, setIsSubmittingGuess] = useState(false);
 
   // Refetch game state when app becomes visible (for PWA background/foreground)
   useEffect(() => {
@@ -282,69 +283,77 @@ function GamePageContent({ gameId }: { gameId: string }) {
   const handleGuess = useCallback(async (wordIndex: number) => {
     if (!game || !user || !playerRole) return;
 
-    const word = game.words[wordIndex];
+    // Prevent multiple simultaneous guesses
+    if (isSubmittingGuess) return;
+    setIsSubmittingGuess(true);
 
-    // Process the guess
-    const result = processGuess(game, wordIndex, playerRole);
+    try {
+      const word = game.words[wordIndex];
 
-    // Insert move
-    const { error: moveError } = await supabase.from('moves').insert({
-      game_id: game.id,
-      player_id: user.id,
-      move_type: 'guess',
-      guess_index: wordIndex,
-      guess_result: result.cardType,
-    });
+      // Process the guess
+      const result = processGuess(game, wordIndex, playerRole);
 
-    if (moveError) {
-      toast.error('Failed to record guess');
-      return;
-    }
+      // Insert move
+      const { error: moveError } = await supabase.from('moves').insert({
+        game_id: game.id,
+        player_id: user.id,
+        move_type: 'guess',
+        guess_index: wordIndex,
+        guess_result: result.cardType,
+      });
 
-    // Prepare game updates
-    const updates: Record<string, unknown> = {
-      board_state: result.newBoardState,
-    };
-
-    // Handle game over
-    if (result.gameOver) {
-      updates.status = 'completed';
-      updates.ended_at = new Date().toISOString();
-      
-      if (result.won) {
-        updates.result = 'win';
-      } else if (result.cardType === 'assassin') {
-        updates.result = 'loss';
-      } else {
-        updates.result = 'loss';
+      if (moveError) {
+        toast.error('Failed to record guess');
+        return;
       }
-    } else if (result.turnEnds) {
-      // Bystander hit
-      if (game.timer_tokens <= 0 || game.sudden_death) {
-        // In sudden death mode - bystander hit = game over
+
+      // Prepare game updates
+      const updates: Record<string, unknown> = {
+        board_state: result.newBoardState,
+      };
+
+      // Handle game over
+      if (result.gameOver) {
         updates.status = 'completed';
         updates.ended_at = new Date().toISOString();
-        updates.result = 'loss';
+
+        if (result.won) {
+          updates.result = 'win';
+        } else if (result.cardType === 'assassin') {
+          updates.result = 'loss';
+        } else {
+          updates.result = 'loss';
+        }
+      } else if (result.turnEnds) {
+        // Bystander hit
+        if (game.timer_tokens <= 0 || game.sudden_death) {
+          // In sudden death mode - bystander hit = game over
+          updates.status = 'completed';
+          updates.ended_at = new Date().toISOString();
+          updates.result = 'loss';
+        } else {
+          // Normal mode - guesser now becomes the clue giver
+          // Token already deducted when clue was given
+          updates.current_turn = playerRole; // I was guessing, now I give clue
+          updates.current_phase = 'clue';
+        }
       } else {
-        // Normal mode - guesser now becomes the clue giver
-        // Token already deducted when clue was given
-        updates.current_turn = playerRole; // I was guessing, now I give clue
-        updates.current_phase = 'clue';
+        // Correct guess - keep guessing
       }
-    } else {
-      // Correct guess - keep guessing
-    }
 
-    // Update game
-    const { error: gameError } = await supabase
-      .from('games')
-      .update(updates)
-      .eq('id', game.id);
+      // Update game
+      const { error: gameError } = await supabase
+        .from('games')
+        .update(updates)
+        .eq('id', game.id);
 
-    if (gameError) {
-      toast.error('Failed to update game');
+      if (gameError) {
+        toast.error('Failed to update game');
+      }
+    } finally {
+      setIsSubmittingGuess(false);
     }
-  }, [game, user, playerRole, supabase, opponent]);
+  }, [game, user, playerRole, supabase, opponent, isSubmittingGuess]);
 
   // Handle ending turn voluntarily
   const handleEndTurn = useCallback(async () => {
@@ -493,6 +502,7 @@ function GamePageContent({ gameId }: { gameId: string }) {
           playerRole={playerRole}
           onGuess={handleGuess}
           hasActiveClue={hasActiveClue}
+          disabled={isSubmittingGuess}
         />
         
         {/* Clue input - right below the board (hidden in sudden death) */}
