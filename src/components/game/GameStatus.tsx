@@ -5,6 +5,8 @@ import { countAgentsFound, countTotalAgentsNeeded, getRemainingAgentsPerPlayer }
 import { cn } from '@/lib/utils';
 import { TappableClueWord } from './TappableClueWord';
 import { Reactions } from './Reactions';
+import { PresenceIndicator } from './PresenceIndicator';
+import { GameChat } from './GameChat';
 
 interface GameStatusProps {
   game: Game;
@@ -13,9 +15,10 @@ interface GameStatusProps {
   currentClue?: Move | null;
   guessCount?: number;
   userId?: string;
+  userName?: string;
 }
 
-export function GameStatus({ game, playerRole, opponentName, currentClue, guessCount = 0, userId }: GameStatusProps) {
+export function GameStatus({ game, playerRole, opponentName, currentClue, guessCount = 0, userId, userName }: GameStatusProps) {
   const isClueGiver = game.current_turn === playerRole;
   const isCluePhase = game.current_phase === 'clue';
   const isGuessPhase = game.current_phase === 'guess';
@@ -99,6 +102,16 @@ export function GameStatus({ game, playerRole, opponentName, currentClue, guessC
                 <Reactions gameId={game.id} playerId={userId} compact />
               </div>
             )}
+            {userId && (
+              <div className="relative">
+                <GameChat
+                  gameId={game.id}
+                  playerId={userId}
+                  playerName={userName || 'You'}
+                  opponentName={opponentName}
+                />
+              </div>
+            )}
           </div>
         </div>
         
@@ -116,6 +129,18 @@ export function GameStatus({ game, playerRole, opponentName, currentClue, guessC
           <div className="flex justify-center text-xs text-stone-300">
             <span>{opponentName || 'They'}: <span className="text-emerald-400 font-bold">{theirRemaining}</span> to find</span>
           </div>
+        )}
+        
+        {/* Partner presence indicator */}
+        {userId && game.status === 'playing' && (
+          <PresenceIndicator
+            gameId={game.id}
+            playerId={userId}
+            opponentName={opponentName}
+            isMyTurn={isClueGiver ? isCluePhase : isGuessPhase}
+            phase={game.current_phase}
+            isClueGiver={isClueGiver}
+          />
         )}
       </div>
     </div>

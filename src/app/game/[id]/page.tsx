@@ -505,6 +505,7 @@ function GamePageContent({ gameId }: { gameId: string }) {
         currentClue={currentClue}
         guessCount={guessCount}
         userId={user?.id}
+        userName={user?.username}
       />
       
       <main className="flex-1 overflow-auto py-2 px-1 flex flex-col">

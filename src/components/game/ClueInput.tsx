@@ -8,6 +8,7 @@ import { getUnrevealedWords } from '@/lib/game/gameLogic';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { broadcastTypingClue } from './PresenceIndicator';
 
 interface ClueInputProps {
   game: Game;
@@ -90,6 +91,7 @@ export function ClueInput({ game, playerRole, onGiveClue, hasActiveClue = false 
             onChange={(e) => {
               setClue(e.target.value.replace(/\s/g, ''));
               setError(null);
+              broadcastTypingClue();
             }}
             placeholder="ENTER ONE-WORD CLUE"
             className={cn(

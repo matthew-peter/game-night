@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useCallback, useRef, memo } from 'react';
+import { useState, useCallback, useRef, memo, useEffect } from 'react';
 import { useGameStore } from '@/lib/store/gameStore';
 import { Game, CurrentTurn, CardType } from '@/lib/supabase/types';
 import { getCardTypeForPlayer } from '@/lib/game/keyGenerator';
 import { isWordRevealed } from '@/lib/game/gameLogic';
 import { cn } from '@/lib/utils';
 import { WordDefinition } from './WordDefinition';
+import { broadcastSelectingWords } from './PresenceIndicator';
 
 interface WordCardProps {
   word: string;
@@ -17,6 +18,7 @@ interface WordCardProps {
   isGuessing: boolean;
   isSelected: boolean;
   isHighlightedForGuess: boolean;
+  flipAnimation: 'agent' | 'bystander' | 'assassin' | null;
   onToggleSelect: (word: string) => void;
   onHighlightForGuess: (wordIndex: number) => void;
   onConfirmGuess: (wordIndex: number) => void;
@@ -31,6 +33,7 @@ const WordCard = memo(function WordCard({
   isGuessing,
   isSelected,
   isHighlightedForGuess,
+  flipAnimation,
   onToggleSelect,
   onHighlightForGuess,
   onConfirmGuess,
@@ -239,18 +242,29 @@ const WordCard = memo(function WordCard({
     setShowDefinition(true);
   }, []);
 
+  // Flip animation class
+  const flipClass = flipAnimation === 'agent'
+    ? 'animate-flip-agent'
+    : flipAnimation === 'assassin'
+    ? 'animate-flip-assassin'
+    : flipAnimation === 'bystander'
+    ? 'animate-flip-bystander'
+    : '';
+
   return (
     <>
-      <button
-        className={cn(
-          'relative w-full aspect-square rounded-lg flex flex-col items-center justify-center overflow-hidden',
-          'transition-all duration-150',
-          'touch-manipulation select-none',
-          styles.card,
-          selectionStyles,
-          highlightStyles,
-          ((!isRevealed || isStillMyAgent) && isGivingClue || canBeGuessed && isGuessing) && 'active:scale-95 cursor-pointer',
-        )}
+      <div className="card-flip-container w-full">
+        <button
+          className={cn(
+            'relative w-full aspect-square rounded-lg flex flex-col items-center justify-center overflow-hidden',
+            'transition-all duration-150',
+            'touch-manipulation select-none',
+            styles.card,
+            selectionStyles,
+            highlightStyles,
+            flipClass,
+            ((!isRevealed || isStillMyAgent) && isGivingClue || canBeGuessed && isGuessing) && 'active:scale-95 cursor-pointer',
+          )}
         onClick={handleClick}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
@@ -293,6 +307,7 @@ const WordCard = memo(function WordCard({
           </div>
         )}
       </button>
+      </div>
       
       {showDefinition && (
         <WordDefinition
@@ -314,6 +329,43 @@ interface GameBoardProps {
 export function GameBoard({ game, playerRole, onGuess, hasActiveClue = false }: GameBoardProps) {
   const { selectedWordsForClue, toggleWordForClue } = useGameStore();
   const [highlightedWordIndex, setHighlightedWordIndex] = useState<number | null>(null);
+  const [flippingWords, setFlippingWords] = useState<Record<string, CardType>>({});
+  const prevRevealedRef = useRef<Record<string, { type: CardType }>>(game.board_state.revealed);
+  
+  // Detect newly revealed cards and trigger flip animation
+  useEffect(() => {
+    const prevRevealed = prevRevealedRef.current;
+    const currentRevealed = game.board_state.revealed;
+    
+    const newlyRevealed: Record<string, CardType> = {};
+    for (const word of Object.keys(currentRevealed)) {
+      if (!prevRevealed[word]) {
+        newlyRevealed[word] = currentRevealed[word].type;
+      }
+    }
+    
+    if (Object.keys(newlyRevealed).length > 0) {
+      setFlippingWords(newlyRevealed);
+      // Clear animation class after animation completes
+      const timeout = setTimeout(() => {
+        setFlippingWords({});
+      }, 900);
+      return () => clearTimeout(timeout);
+    }
+    
+    prevRevealedRef.current = currentRevealed;
+  }, [game.board_state.revealed]);
+  
+  // Keep the ref in sync even when no new reveals
+  useEffect(() => {
+    prevRevealedRef.current = game.board_state.revealed;
+  });
+
+  // Wrap toggleWordForClue to also broadcast presence
+  const handleToggleWordForClue = useCallback((word: string) => {
+    toggleWordForClue(word);
+    broadcastSelectingWords();
+  }, [toggleWordForClue]);
   
   const isClueGiver = game.current_turn === playerRole;
   const isGuesser = game.current_turn !== playerRole;
@@ -348,7 +400,8 @@ export function GameBoard({ game, playerRole, onGuess, hasActiveClue = false }: 
             isGuessing={isGuessing}
             isSelected={selectedWordsForClue.has(word)}
             isHighlightedForGuess={highlightedWordIndex === index}
-            onToggleSelect={toggleWordForClue}
+            flipAnimation={flippingWords[word] || null}
+            onToggleSelect={handleToggleWordForClue}
             onHighlightForGuess={handleHighlightForGuess}
             onConfirmGuess={handleConfirmGuess}
           />
