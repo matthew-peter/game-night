@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, memo } from 'react';
 import { useGameStore } from '@/lib/store/gameStore';
 import { Game, CurrentTurn, CardType } from '@/lib/supabase/types';
 import { getCardTypeForPlayer } from '@/lib/game/keyGenerator';
@@ -22,7 +22,7 @@ interface WordCardProps {
   onConfirmGuess: (wordIndex: number) => void;
 }
 
-function WordCard({
+const WordCard = memo(function WordCard({
   word,
   index,
   game,
@@ -57,8 +57,6 @@ function WordCard({
   
   // Is this card still an agent on MY key that my partner needs to find?
   const isStillMyAgent = !alreadyFoundAsAgent && cardTypeForMe === 'agent';
-  
-  // Dynamic font size based on word length
   
   // Dynamic font size based on word length
   const getFontSize = () => {
@@ -304,17 +302,16 @@ function WordCard({
       )}
     </>
   );
-}
+});
 
 interface GameBoardProps {
   game: Game;
   playerRole: CurrentTurn;
   onGuess: (wordIndex: number) => void;
   hasActiveClue?: boolean;
-  disabled?: boolean;
 }
 
-export function GameBoard({ game, playerRole, onGuess, hasActiveClue = false, disabled = false }: GameBoardProps) {
+export function GameBoard({ game, playerRole, onGuess, hasActiveClue = false }: GameBoardProps) {
   const { selectedWordsForClue, toggleWordForClue } = useGameStore();
   const [highlightedWordIndex, setHighlightedWordIndex] = useState<number | null>(null);
   
@@ -333,10 +330,9 @@ export function GameBoard({ game, playerRole, onGuess, hasActiveClue = false, di
   }, []);
   
   const handleConfirmGuess = useCallback((wordIndex: number) => {
-    if (disabled) return;
     setHighlightedWordIndex(null);
     onGuess(wordIndex);
-  }, [onGuess, disabled]);
+  }, [onGuess]);
   
   return (
     <div className="w-full max-w-md mx-auto px-1">

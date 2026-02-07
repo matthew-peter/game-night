@@ -59,7 +59,6 @@ function WaitingRoomContent({ gameId }: { gameId: string }) {
           filter: `id=eq.${gameId}`,
         },
         (payload) => {
-          console.log('Game update received:', payload);
           const updatedGame = payload.new as Game;
           setGame(updatedGame);
 
@@ -69,27 +68,10 @@ function WaitingRoomContent({ gameId }: { gameId: string }) {
           }
         }
       )
-      .subscribe((status) => {
-        console.log('Subscription status:', status);
-      });
-
-    // Fallback polling in case realtime doesn't work
-    const pollInterval = setInterval(async () => {
-      const { data } = await supabase
-        .from('games')
-        .select('status')
-        .eq('id', gameId)
-        .single();
-      
-      if (data?.status === 'playing') {
-        console.log('Polling detected game started');
-        router.push(`/game/${gameId}`);
-      }
-    }, 3000); // Poll every 3 seconds
+      .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
-      clearInterval(pollInterval);
     };
   }, [gameId, supabase, router]);
 

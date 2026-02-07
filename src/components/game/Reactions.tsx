@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 
@@ -22,6 +22,7 @@ export function Reactions({ gameId, playerId, compact = false }: ReactionsProps)
   const [incomingReactions, setIncomingReactions] = useState<IncomingReaction[]>([]);
   const [sendingEmoji, setSendingEmoji] = useState<string | null>(null);
   const supabase = createClient();
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   // Subscribe to reactions
   useEffect(() => {
@@ -31,11 +32,11 @@ export function Reactions({ gameId, playerId, compact = false }: ReactionsProps)
         // Only show reactions from the other player
         if (payload.payload.senderId !== playerId) {
           const reactionId = `${Date.now()}-${Math.random()}`;
-          setIncomingReactions(prev => [...prev, { 
-            emoji: payload.payload.emoji, 
-            id: reactionId 
+          setIncomingReactions(prev => [...prev, {
+            emoji: payload.payload.emoji,
+            id: reactionId
           }]);
-          
+
           // Remove after animation
           setTimeout(() => {
             setIncomingReactions(prev => prev.filter(r => r.id !== reactionId));
@@ -44,7 +45,10 @@ export function Reactions({ gameId, playerId, compact = false }: ReactionsProps)
       })
       .subscribe();
 
+    channelRef.current = channel;
+
     return () => {
+      channelRef.current = null;
       supabase.removeChannel(channel);
     };
   }, [gameId, playerId, supabase]);
@@ -52,17 +56,18 @@ export function Reactions({ gameId, playerId, compact = false }: ReactionsProps)
   const sendReaction = useCallback(async (emoji: string) => {
     setSendingEmoji(emoji);
     setIsOpen(false);
-    
-    const channel = supabase.channel(`reactions-${gameId}`);
-    await channel.send({
-      type: 'broadcast',
-      event: 'reaction',
-      payload: { emoji, senderId: playerId }
-    });
-    
+
+    if (channelRef.current) {
+      await channelRef.current.send({
+        type: 'broadcast',
+        event: 'reaction',
+        payload: { emoji, senderId: playerId }
+      });
+    }
+
     // Brief feedback then clear
     setTimeout(() => setSendingEmoji(null), 300);
-  }, [gameId, playerId, supabase]);
+  }, [playerId]);
 
   return (
     <>

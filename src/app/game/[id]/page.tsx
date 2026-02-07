@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, use } from 'react';
+import { useEffect, useState, useCallback, useRef, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { AuthProvider, useAuth } from '@/components/auth/AuthProvider';
 import { Header } from '@/components/shared/Header';
@@ -36,7 +36,8 @@ function GamePageContent({ gameId }: { gameId: string }) {
   
   const [loading, setLoading] = useState(true);
   const [playerRole, setPlayerRole] = useState<CurrentTurn | null>(null);
-  const [isSubmittingGuess, setIsSubmittingGuess] = useState(false);
+  const isSubmittingGuess = useRef(false);
+  const autoSkipKey = useRef<string | null>(null);
 
   // Refetch game state when app becomes visible (for PWA background/foreground)
   useEffect(() => {
@@ -44,8 +45,6 @@ function GamePageContent({ gameId }: { gameId: string }) {
 
     const handleVisibilityChange = async () => {
       if (document.visibilityState === 'visible') {
-        console.log('App became visible, refetching game state...');
-        
         // Refetch game
         const { data: gameData } = await supabase
           .from('games')
@@ -153,13 +152,8 @@ function GamePageContent({ gameId }: { gameId: string }) {
           filter: `id=eq.${gameId}`,
         },
         (payload) => {
-          console.log('Game update received:', payload);
-          console.log('New board_state:', payload.new?.board_state);
           const updatedGame = payload.new as Game;
           setGame(updatedGame);
-          
-          // If board state changed (someone guessed), the UI will update
-          // The game prop flows to GameBoard which reads board_state.revealed
         }
       )
       .on(
@@ -175,9 +169,7 @@ function GamePageContent({ gameId }: { gameId: string }) {
           router.push('/dashboard');
         }
       )
-      .subscribe((status) => {
-        console.log('Game channel status:', status);
-      });
+      .subscribe();
 
     // Subscribe to moves
     const movesChannel = supabase
@@ -208,9 +200,7 @@ function GamePageContent({ gameId }: { gameId: string }) {
           }
         }
       )
-      .subscribe((status) => {
-        console.log('Moves channel status:', status);
-      });
+      .subscribe();
 
     return () => {
       supabase.removeChannel(gameChannel);
@@ -284,8 +274,8 @@ function GamePageContent({ gameId }: { gameId: string }) {
     if (!game || !user || !playerRole) return;
 
     // Prevent multiple simultaneous guesses
-    if (isSubmittingGuess) return;
-    setIsSubmittingGuess(true);
+    if (isSubmittingGuess.current) return;
+    isSubmittingGuess.current = true;
 
     try {
       const word = game.words[wordIndex];
@@ -351,9 +341,9 @@ function GamePageContent({ gameId }: { gameId: string }) {
         toast.error('Failed to update game');
       }
     } finally {
-      setIsSubmittingGuess(false);
+      isSubmittingGuess.current = false;
     }
-  }, [game, user, playerRole, supabase, opponent, isSubmittingGuess]);
+  }, [game, user, playerRole, supabase, opponent]);
 
   // Handle ending turn voluntarily
   const handleEndTurn = useCallback(async () => {
@@ -389,19 +379,24 @@ function GamePageContent({ gameId }: { gameId: string }) {
   useEffect(() => {
     if (!game || !user || !playerRole || game.status !== 'playing') return;
     if (game.current_phase !== 'clue') return;
-    
+
     // Only the current clue giver should trigger the skip
     if (game.current_turn !== playerRole) return;
-    
+
+    // Prevent firing multiple times for the same turn/phase
+    const skipKey = `${game.current_turn}-${game.current_phase}`;
+    if (autoSkipKey.current === skipKey) return;
+
     const inSuddenDeath = game.timer_tokens <= 0 || game.sudden_death;
-    
+
     // Check if I have any agents left on my key for partner to guess
     const remaining = getRemainingAgentsPerPlayer(game);
     const myRemaining = playerRole === 'player1' ? remaining.player1 : remaining.player2;
-    
+
     // In sudden death: switch to guess phase, other player guesses
     // No agents left: pass to partner to give clue (unless also sudden death)
     if (inSuddenDeath) {
+      autoSkipKey.current = skipKey;
       // Sudden death - no clues allowed, switch to guess phase
       const autoSkipToGuess = async () => {
         const otherPlayer = playerRole === 'player1' ? 'player2' : 'player1';
@@ -413,9 +408,10 @@ function GamePageContent({ gameId }: { gameId: string }) {
           })
           .eq('id', game.id);
       };
-      
+
       autoSkipToGuess();
     } else if (myRemaining === 0) {
+      autoSkipKey.current = skipKey;
       // I have no agents left - auto-pass to partner to give clue
       const autoSkip = async () => {
         // Create a "pass" move
@@ -435,7 +431,7 @@ function GamePageContent({ gameId }: { gameId: string }) {
           })
           .eq('id', game.id);
       };
-      
+
       autoSkip();
     }
   }, [game, user, playerRole, supabase]);
@@ -502,7 +498,6 @@ function GamePageContent({ gameId }: { gameId: string }) {
           playerRole={playerRole}
           onGuess={handleGuess}
           hasActiveClue={hasActiveClue}
-          disabled={isSubmittingGuess}
         />
         
         {/* Clue input - right below the board (hidden in sudden death) */}

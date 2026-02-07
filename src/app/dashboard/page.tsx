@@ -15,6 +15,7 @@ import { createClient } from '@/lib/supabase/client';
 import { getRandomWords } from '@/lib/game/words';
 import { generateKeyCard } from '@/lib/game/keyGenerator';
 import { generatePin } from '@/lib/utils/pin';
+import { countAgentsFound, countTotalAgentsNeeded } from '@/lib/game/gameLogic';
 import { ClueStrictness, Game } from '@/lib/supabase/types';
 import { toast } from 'sonner';
 import { Plus, Users, History, Play, Clock, Loader2, X, Trash2 } from 'lucide-react';
@@ -322,8 +323,8 @@ function DashboardContent() {
                     // My turn = I'm clue giver and it's clue phase, OR I'm guesser and it's guess phase
                     const isYourTurn = (amIClueGiver && isCluePhase) || (!amIClueGiver && !isCluePhase);
                     const isWaiting = game.status === 'waiting';
-                    const yourAgents = game.player1_id === user.id ? game.player1_agents_found : game.player2_agents_found;
-                    const theirAgents = game.player1_id === user.id ? game.player2_agents_found : game.player1_agents_found;
+                    const agentsFound = countAgentsFound(game.board_state);
+                    const totalAgents = countTotalAgentsNeeded(game.key_card);
                     
                     return (
                       <div
@@ -348,7 +349,7 @@ function DashboardContent() {
                             {!isWaiting && (
                               <>
                                 <span className="text-xs text-stone-400">
-                                  You: {yourAgents}/9 · Them: {theirAgents}/9
+                                  {agentsFound}/{totalAgents} found
                                 </span>
                                 <span className="text-xs">
                                   {isYourTurn ? (
