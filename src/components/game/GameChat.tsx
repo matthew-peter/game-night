@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 import { MessageCircle, Send, X } from 'lucide-react';
+import { createPortal } from 'react-dom';
 
 const MAX_MESSAGE_LENGTH = 60;
 
@@ -30,6 +31,13 @@ export function GameChat({ gameId, playerId, playerName, opponentName = 'Partner
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [panelPos, setPanelPos] = useState<{ top: number; right: number } | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Subscribe to chat messages
   useEffect(() => {
@@ -71,6 +79,14 @@ export function GameChat({ gameId, playerId, playerName, opponentName = 'Partner
   useEffect(() => {
     if (isOpen) {
       setUnreadCount(0);
+      // Calculate panel position from button
+      if (buttonRef.current) {
+        const rect = buttonRef.current.getBoundingClientRect();
+        setPanelPos({
+          top: rect.bottom + 4,
+          right: window.innerWidth - rect.right,
+        });
+      }
     }
   }, [isOpen]);
 
@@ -118,6 +134,7 @@ export function GameChat({ gameId, playerId, playerName, opponentName = 'Partner
     <>
       {/* Chat toggle button */}
       <button
+        ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
           'rounded-full flex items-center justify-center transition-all relative',
@@ -139,9 +156,18 @@ export function GameChat({ gameId, playerId, playerName, opponentName = 'Partner
         )}
       </button>
 
-      {/* Chat panel */}
-      {isOpen && (
-        <div className="absolute right-0 top-9 w-64 bg-stone-800 rounded-xl shadow-xl border border-stone-600 z-50 animate-in slide-in-from-top-2 duration-150 flex flex-col max-h-[280px]">
+      {/* Chat panel — rendered as a portal with fixed positioning to avoid iOS scroll */}
+      {isOpen && mounted && panelPos && createPortal(
+        <>
+          {/* Backdrop to close */}
+          <div
+            className="fixed inset-0 z-[99]"
+            onClick={() => setIsOpen(false)}
+          />
+          <div
+            className="fixed w-64 bg-stone-800 rounded-xl shadow-xl border border-stone-600 z-[100] animate-in slide-in-from-top-2 duration-150 flex flex-col max-h-[280px]"
+            style={{ top: panelPos.top, right: panelPos.right }}
+          >
           {/* Header */}
           <div className="px-3 py-2 border-b border-stone-700 flex items-center justify-between">
             <span className="text-xs font-semibold text-white">Chat</span>
@@ -195,12 +221,22 @@ export function GameChat({ gameId, playerId, playerName, opponentName = 'Partner
                   setMessage(e.target.value.slice(0, MAX_MESSAGE_LENGTH))
                 }
                 onKeyDown={handleKeyDown}
+                onFocus={(e) => {
+                  // Prevent iOS from scrolling the page when input is focused
+                  e.preventDefault();
+                  setTimeout(() => {
+                    window.scrollTo(0, 0);
+                    document.body.scrollTop = 0;
+                  }, 50);
+                }}
                 placeholder="Type a message..."
                 className="flex-1 bg-stone-700 text-white text-xs rounded-lg px-2.5 py-1.5 
                            placeholder:text-stone-400 outline-none focus:ring-1 focus:ring-blue-400
                            border border-stone-600"
+                style={{ fontSize: '16px' }}
                 maxLength={MAX_MESSAGE_LENGTH}
                 autoComplete="off"
+                enterKeyHint="send"
               />
               <button
                 onClick={sendMessage}
@@ -221,7 +257,9 @@ export function GameChat({ gameId, playerId, playerName, opponentName = 'Partner
               </span>
             )}
           </div>
-        </div>
+          </div>
+        </>,
+        document.body
       )}
     </>
   );
