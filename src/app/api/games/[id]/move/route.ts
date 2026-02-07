@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { validateClue } from '@/lib/game/clueValidator';
 import { getCardTypeForPlayer } from '@/lib/game/keyGenerator';
-import { isWordRevealed, getNextTurn } from '@/lib/game/gameLogic';
+import { isWordRevealed, getNextTurn, getRemainingAgentsPerPlayer } from '@/lib/game/gameLogic';
 import { BoardState, KeyCard, ClueStrictness, CurrentTurn, RevealedCard } from '@/lib/supabase/types';
 
 export async function POST(
@@ -86,7 +86,7 @@ export async function POST(
       }
 
       // Create the move
-      const { error: moveError } = await supabase
+      const { data: moveData, error: moveError } = await supabase
         .from('moves')
         .insert({
           game_id: id,
@@ -95,9 +95,11 @@ export async function POST(
           clue_word: clueWord.toLowerCase(),
           clue_number: intendedWords?.length ?? 0,
           intended_words: intendedWords,
-        } as Record<string, unknown>);
+        } as Record<string, unknown>)
+        .select('id')
+        .single();
 
-      if (moveError) {
+      if (moveError || !moveData) {
         console.error('Error creating move:', moveError);
         return NextResponse.json({ error: 'Failed to save move' }, { status: 500 });
       }
@@ -106,12 +108,8 @@ export async function POST(
       const newTokens = game.timer_tokens - 1;
       
       const updateData: Record<string, unknown> = {
-        current_clue: { 
-          word: clueWord.toLowerCase(), 
-          number: intendedWords?.length ?? 0,
-          intendedWords: intendedWords ?? []
-        },
-        guesses_this_turn: 0,
+        current_clue_id: moveData.id,
+        current_phase: 'guess',
         timer_tokens: newTokens,
       };
       
@@ -219,8 +217,23 @@ export async function POST(
         // Wrong guess (bystander) - switch turns (token already deducted when clue was given)
         updateData.current_turn = getNextTurn(currentTurn);
         updateData.current_phase = 'clue';
+      } else if (suddenDeath) {
+        // Agent found in sudden death — check if more agents remain on this side
+        // If not, auto-switch so the other player guesses on the remaining side
+        const currentSideAgents = currentTurn === 'player1'
+          ? game.key_card.player1.agents : game.key_card.player2.agents;
+        const agentsLeftOnCurrentSide = currentSideAgents.filter(idx => {
+          const w = game.words[idx];
+          const rev = newBoardState.revealed[w];
+          return !rev || rev.type !== 'agent';
+        }).length;
+
+        if (agentsLeftOnCurrentSide === 0) {
+          // No more agents on this side — switch so other player guesses the other side
+          updateData.current_turn = getNextTurn(currentTurn);
+        }
       }
-      // If agent found, continue guessing (don't update turn)
+      // If agent found (non-sudden-death), continue guessing (don't update turn)
 
       const { error: updateError } = await supabase
         .from('games')
@@ -261,9 +274,27 @@ export async function POST(
       }
 
       // Token already deducted when clue was given
+      const inSuddenDeath = game.sudden_death || game.timer_tokens <= 0;
+
+      if (inSuddenDeath) {
+        // In sudden death, check if the other player has agents to find
+        // before allowing the pass
+        const newTurn = getNextTurn(currentTurn);
+        const gameForCalc = game as unknown as Parameters<typeof getRemainingAgentsPerPlayer>[0];
+        const remaining = getRemainingAgentsPerPlayer(gameForCalc);
+        const agentsOnNewSide = newTurn === 'player1' ? remaining.player1 : remaining.player2;
+
+        if (agentsOnNewSide === 0) {
+          return NextResponse.json(
+            { error: 'Cannot end turn — your partner has no agents left to find' },
+            { status: 400 }
+          );
+        }
+      }
+
       const updateData: Record<string, unknown> = {
         current_turn: getNextTurn(currentTurn),
-        current_phase: 'clue',
+        current_phase: inSuddenDeath ? 'guess' : 'clue',
       };
 
       const { error: updateError } = await supabase

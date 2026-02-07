@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef, use } from 'react';
+import { useEffect, useState, useCallback, useRef, use, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { AuthProvider, useAuth } from '@/components/auth/AuthProvider';
 import { Header } from '@/components/shared/Header';
@@ -20,7 +20,9 @@ import { toast } from 'sonner';
 function GamePageContent({ gameId }: { gameId: string }) {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const supabase = createClient();
+  // Memoize the Supabase client so it's not recreated on every render.
+  // This prevents subscription churn and useEffect re-runs.
+  const supabase = useMemo(() => createClient(), []);
   
   const {
     game,
@@ -74,7 +76,8 @@ function GamePageContent({ gameId }: { gameId: string }) {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [gameId, user, supabase, setGame, setMoves]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameId, user]);
 
   // Fetch game and set up subscriptions
   useEffect(() => {
@@ -171,7 +174,8 @@ function GamePageContent({ gameId }: { gameId: string }) {
       )
       .subscribe();
 
-    // Subscribe to moves
+    // Subscribe to moves - only add new moves, don't refetch game
+    // (game updates come through the game channel already)
     const movesChannel = supabase
       .channel(`moves-${gameId}`)
       .on(
@@ -182,22 +186,9 @@ function GamePageContent({ gameId }: { gameId: string }) {
           table: 'moves',
           filter: `game_id=eq.${gameId}`,
         },
-        async (payload) => {
+        (payload) => {
           const newMove = payload.new as Move;
           addMove(newMove);
-          
-          // If this is a move from the OTHER player, refetch game to update board
-          if (newMove.player_id !== user?.id) {
-            const { data: updatedGame } = await supabase
-              .from('games')
-              .select('*')
-              .eq('id', gameId)
-              .single();
-            
-            if (updatedGame) {
-              setGame(updatedGame);
-            }
-          }
         }
       )
       .subscribe();
@@ -206,70 +197,69 @@ function GamePageContent({ gameId }: { gameId: string }) {
       supabase.removeChannel(gameChannel);
       supabase.removeChannel(movesChannel);
     };
-  }, [gameId, user, supabase, router, setGame, setMoves, addMove, setOpponent]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameId, user]);
 
-  // Handle giving a clue
+  // Handle giving a clue — use API route for validation + atomic write
   const handleGiveClue = useCallback(async (clue: string, intendedWordIndices: number[]) => {
     if (!game || !user || !playerRole) return;
 
     const clueNumber = intendedWordIndices.length;
 
-    // Insert move via API or directly
-    const { error: moveError } = await supabase.from('moves').insert({
-      game_id: game.id,
-      player_id: user.id,
-      move_type: 'clue',
-      clue_word: clue,
-      intended_words: intendedWordIndices,
-      clue_number: clueNumber,
-    });
-
-    if (moveError) {
-      toast.error('Failed to give clue');
-      return;
-    }
-
-    // Deduct a timer token (each clue = 1 round)
-    const newTokens = game.timer_tokens - 1;
-    
-    const updates: Record<string, unknown> = {
+    // Optimistic update: immediately show guess phase
+    updateGame({
       current_phase: 'guess',
-      timer_tokens: newTokens,
-      // current_turn stays the same - it represents the clue giver
-    };
-    
-    // Check if out of tokens (sudden death)
-    if (newTokens <= 0) {
-      updates.timer_tokens = 0;
-      updates.sudden_death = true;
-    }
-
-    // Update game state
-    const { error: gameError } = await supabase
-      .from('games')
-      .update(updates)
-      .eq('id', game.id);
-
-    if (gameError) {
-      toast.error('Failed to update game');
-      return;
-    }
-
-    // Notify opponent it's their turn to guess
-    // The opponent is the guesser (not the clue giver)
-    if (opponent) {
-      await sendTurnNotification(
-        game.id,
-        opponent.id,
-        user.username,
-        `${user.username} gave clue: "${clue.toUpperCase()}" (${clueNumber}) - Your turn to guess!`
-      );
-    }
-
+      timer_tokens: Math.max(0, game.timer_tokens - 1),
+      sudden_death: game.timer_tokens - 1 <= 0 ? true : game.sudden_death,
+    });
     clearSelectedWords();
-  }, [game, user, playerRole, supabase, clearSelectedWords, opponent]);
 
-  // Handle guessing a word
+    try {
+      const res = await fetch(`/api/games/${game.id}/move`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          moveType: 'clue',
+          clueWord: clue,
+          intendedWords: intendedWordIndices,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        toast.error(data.error || 'Failed to give clue');
+        // Revert optimistic update by refetching
+        const { data: freshGame } = await supabase
+          .from('games')
+          .select('*')
+          .eq('id', game.id)
+          .single();
+        if (freshGame) setGame(freshGame);
+        return;
+      }
+
+      // Notify opponent it's their turn to guess
+      if (opponent) {
+        sendTurnNotification(
+          game.id,
+          opponent.id,
+          user.username,
+          `${user.username} gave clue: "${clue.toUpperCase()}" (${clueNumber}) - Your turn to guess!`
+        );
+      }
+    } catch {
+      toast.error('Network error — please try again');
+      // Revert optimistic update
+      const { data: freshGame } = await supabase
+        .from('games')
+        .select('*')
+        .eq('id', game.id)
+        .single();
+      if (freshGame) setGame(freshGame);
+    }
+  }, [game, user, playerRole, supabase, clearSelectedWords, opponent, updateGame, setGame]);
+
+  // Handle guessing a word — use API route + optimistic local update
   const handleGuess = useCallback(async (wordIndex: number) => {
     if (!game || !user || !playerRole) return;
 
@@ -278,102 +268,124 @@ function GamePageContent({ gameId }: { gameId: string }) {
     isSubmittingGuess.current = true;
 
     try {
-      const word = game.words[wordIndex];
-
-      // Process the guess
+      // Process guess locally for optimistic update
       const result = processGuess(game, wordIndex, playerRole);
 
-      // Insert move
-      const { error: moveError } = await supabase.from('moves').insert({
-        game_id: game.id,
-        player_id: user.id,
-        move_type: 'guess',
-        guess_index: wordIndex,
-        guess_result: result.cardType,
-      });
-
-      if (moveError) {
-        toast.error('Failed to record guess');
-        return;
-      }
-
-      // Prepare game updates
-      const updates: Record<string, unknown> = {
+      // Optimistic update — immediately show card flip
+      const optimisticUpdates: Partial<Game> = {
         board_state: result.newBoardState,
       };
-
-      // Handle game over
       if (result.gameOver) {
-        updates.status = 'completed';
-        updates.ended_at = new Date().toISOString();
-
-        if (result.won) {
-          updates.result = 'win';
-        } else if (result.cardType === 'assassin') {
-          updates.result = 'loss';
-        } else {
-          updates.result = 'loss';
-        }
+        optimisticUpdates.status = 'completed';
+        optimisticUpdates.result = result.won ? 'win' : 'loss';
       } else if (result.turnEnds) {
-        // Bystander hit
         if (game.timer_tokens <= 0 || game.sudden_death) {
-          // In sudden death mode - bystander hit = game over
-          updates.status = 'completed';
-          updates.ended_at = new Date().toISOString();
-          updates.result = 'loss';
+          optimisticUpdates.status = 'completed';
+          optimisticUpdates.result = 'loss';
         } else {
-          // Normal mode - guesser now becomes the clue giver
-          // Token already deducted when clue was given
-          updates.current_turn = playerRole; // I was guessing, now I give clue
-          updates.current_phase = 'clue';
+          optimisticUpdates.current_turn = playerRole;
+          optimisticUpdates.current_phase = 'clue';
         }
-      } else {
-        // Correct guess - keep guessing
+      } else if (game.sudden_death || game.timer_tokens <= 0) {
+        // Agent found in sudden death — check if more agents remain on this side
+        const clueGiver = game.current_turn;
+        const sideAgents = clueGiver === 'player1'
+          ? game.key_card.player1.agents : game.key_card.player2.agents;
+        const tempGame = { ...game, board_state: result.newBoardState };
+        const remaining = getRemainingAgentsPerPlayer(tempGame);
+        const agentsLeftOnSide = clueGiver === 'player1' ? remaining.player1 : remaining.player2;
+        if (agentsLeftOnSide === 0) {
+          // Switch sides so the other player guesses
+          optimisticUpdates.current_turn = getNextTurn(clueGiver);
+        }
       }
+      updateGame(optimisticUpdates);
 
-      // Update game
-      const { error: gameError } = await supabase
+      // Send to API
+      const res = await fetch(`/api/games/${game.id}/move`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          moveType: 'guess',
+          guessIndex: wordIndex,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        toast.error(data.error || 'Failed to guess');
+        // Revert optimistic update
+        const { data: freshGame } = await supabase
+          .from('games')
+          .select('*')
+          .eq('id', game.id)
+          .single();
+        if (freshGame) setGame(freshGame);
+      }
+    } catch {
+      toast.error('Network error — please try again');
+      const { data: freshGame } = await supabase
         .from('games')
-        .update(updates)
-        .eq('id', game.id);
-
-      if (gameError) {
-        toast.error('Failed to update game');
-      }
+        .select('*')
+        .eq('id', game.id)
+        .single();
+      if (freshGame) setGame(freshGame);
     } finally {
       isSubmittingGuess.current = false;
     }
-  }, [game, user, playerRole, supabase, opponent]);
+  }, [game, user, playerRole, supabase, updateGame, setGame]);
 
-  // Handle ending turn voluntarily
+  // Handle ending turn voluntarily — use API route + optimistic update
   const handleEndTurn = useCallback(async () => {
     if (!game || !user || !playerRole) return;
 
-    // Create end turn move
-    await supabase.from('moves').insert({
-      game_id: game.id,
-      player_id: user.id,
-      move_type: 'end_turn',
+    const inSuddenDeath = game.timer_tokens <= 0 || game.sudden_death;
+
+    // In sudden death, check if the other player has agents to find
+    if (inSuddenDeath) {
+      const remaining = getRemainingAgentsPerPlayer(game);
+      // After switching, current_turn becomes me (playerRole).
+      // The new guesser would be the other player, finding agents on MY key.
+      const myKeyRemaining = playerRole === 'player1' ? remaining.player1 : remaining.player2;
+      if (myKeyRemaining === 0) {
+        toast.error('Cannot end turn — your partner has no agents left to find');
+        return;
+      }
+    }
+
+    // Optimistic update
+    updateGame({
+      current_turn: playerRole,
+      current_phase: inSuddenDeath ? 'guess' : 'clue',
     });
 
-    // Update game - guesser ends turn, becomes next clue giver
-    // Token already deducted when clue was given
-    // But in sudden death, we stay in guess phase and switch guesser
-    const inSuddenDeath = game.timer_tokens <= 0 || game.sudden_death;
-    const updates: Record<string, unknown> = {
-      current_turn: playerRole, // I was guessing, now I give clue (or partner guesses in sudden death)
-      current_phase: inSuddenDeath ? 'guess' : 'clue',
-    };
-    
-    const { error } = await supabase
-      .from('games')
-      .update(updates)
-      .eq('id', game.id);
+    try {
+      const res = await fetch(`/api/games/${game.id}/move`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ moveType: 'end_turn' }),
+      });
 
-    if (error) {
-      toast.error('Failed to end turn');
+      if (!res.ok) {
+        const data = await res.json();
+        toast.error(data.error || 'Failed to end turn');
+        const { data: freshGame } = await supabase
+          .from('games')
+          .select('*')
+          .eq('id', game.id)
+          .single();
+        if (freshGame) setGame(freshGame);
+      }
+    } catch {
+      toast.error('Network error — please try again');
+      const { data: freshGame } = await supabase
+        .from('games')
+        .select('*')
+        .eq('id', game.id)
+        .single();
+      if (freshGame) setGame(freshGame);
     }
-  }, [game, user, playerRole, supabase, opponent]);
+  }, [game, user, playerRole, supabase, updateGame, setGame]);
 
   // Auto-skip clue phase if in sudden death OR clue giver has no agents left
   useEffect(() => {
@@ -384,7 +396,7 @@ function GamePageContent({ gameId }: { gameId: string }) {
     if (game.current_turn !== playerRole) return;
 
     // Prevent firing multiple times for the same turn/phase
-    const skipKey = `${game.current_turn}-${game.current_phase}`;
+    const skipKey = `${game.current_turn}-${game.current_phase}-${Object.keys(game.board_state.revealed).length}`;
     if (autoSkipKey.current === skipKey) return;
 
     const inSuddenDeath = game.timer_tokens <= 0 || game.sudden_death;
@@ -392,49 +404,52 @@ function GamePageContent({ gameId }: { gameId: string }) {
     // Check if I have any agents left on my key for partner to guess
     const remaining = getRemainingAgentsPerPlayer(game);
     const myRemaining = playerRole === 'player1' ? remaining.player1 : remaining.player2;
+    const theirRemaining = playerRole === 'player1' ? remaining.player2 : remaining.player1;
 
-    // In sudden death: switch to guess phase, other player guesses
-    // No agents left: pass to partner to give clue (unless also sudden death)
+    const otherPlayer = playerRole === 'player1' ? 'player2' : 'player1';
+
     if (inSuddenDeath) {
       autoSkipKey.current = skipKey;
-      // Sudden death - no clues allowed, switch to guess phase
-      const autoSkipToGuess = async () => {
-        const otherPlayer = playerRole === 'player1' ? 'player2' : 'player1';
-        await supabase
+      // In sudden death, pick the right guesser based on who has agents to find:
+      // - If I have agents on my key (myRemaining > 0), the other player should guess my key
+      //   → current_turn = me, guesser = otherPlayer
+      // - If only they have agents on their key (theirRemaining > 0), I should guess their key
+      //   → current_turn = otherPlayer, guesser = me
+      if (myRemaining > 0) {
+        // Other player guesses my key
+        updateGame({ current_turn: playerRole, current_phase: 'guess' });
+        supabase
           .from('games')
-          .update({
-            current_turn: otherPlayer, // Other player guesses
-            current_phase: 'guess',
-          })
-          .eq('id', game.id);
-      };
-
-      autoSkipToGuess();
+          .update({ current_turn: playerRole, current_phase: 'guess' })
+          .eq('id', game.id)
+          .then();
+      } else if (theirRemaining > 0) {
+        // I guess their key
+        updateGame({ current_turn: otherPlayer, current_phase: 'guess' });
+        supabase
+          .from('games')
+          .update({ current_turn: otherPlayer, current_phase: 'guess' })
+          .eq('id', game.id)
+          .then();
+      }
     } else if (myRemaining === 0) {
       autoSkipKey.current = skipKey;
       // I have no agents left - auto-pass to partner to give clue
-      const autoSkip = async () => {
-        // Create a "pass" move
-        await supabase.from('moves').insert({
-          game_id: game.id,
-          player_id: user.id,
-          move_type: 'end_turn',
-        });
-
-        // Switch turn to partner - they become the clue giver
-        const otherPlayer = playerRole === 'player1' ? 'player2' : 'player1';
-        await supabase
+      updateGame({ current_turn: otherPlayer, current_phase: 'clue' });
+      supabase.from('moves').insert({
+        game_id: game.id,
+        player_id: user.id,
+        move_type: 'end_turn',
+      }).then(() => {
+        supabase
           .from('games')
-          .update({
-            current_turn: otherPlayer,
-            current_phase: 'clue',
-          })
-          .eq('id', game.id);
-      };
-
-      autoSkip();
+          .update({ current_turn: otherPlayer, current_phase: 'clue' })
+          .eq('id', game.id)
+          .then();
+      });
     }
-  }, [game, user, playerRole, supabase]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game, user, playerRole]);
 
   if (authLoading || loading) {
     return (

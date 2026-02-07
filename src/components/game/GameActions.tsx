@@ -1,6 +1,7 @@
 'use client';
 
 import { Game, CurrentTurn } from '@/lib/supabase/types';
+import { getRemainingAgentsPerPlayer } from '@/lib/game/gameLogic';
 import { Button } from '@/components/ui/button';
 
 interface GameActionsProps {
@@ -20,8 +21,17 @@ export function GameActions({
   const isGuesser = game.current_turn !== playerRole;
   const isGuessPhase = game.current_phase === 'guess';
   const isGuessing = isGuesser && isGuessPhase && game.status === 'playing';
+  const inSuddenDeath = game.timer_tokens <= 0 || game.sudden_death;
   
-  const canEndTurn = isGuessing && guessCount > 0;
+  // In sudden death, only show End Turn if the other player also has agents to find.
+  // After ending turn, current_turn becomes me (playerRole), and the other player
+  // becomes the guesser — they need agents on MY key to find.
+  let canEndTurn = isGuessing && guessCount > 0;
+  if (canEndTurn && inSuddenDeath) {
+    const remaining = getRemainingAgentsPerPlayer(game);
+    const myKeyRemaining = playerRole === 'player1' ? remaining.player1 : remaining.player2;
+    canEndTurn = myKeyRemaining > 0;
+  }
   
   return (
     <div className="bg-stone-800 border-t border-stone-600 px-2 py-2">
