@@ -191,6 +191,9 @@ function WordCard({
     // Mark that we handled this via touch (prevent click from also firing)
     handledByTouch.current = true;
     
+    // Prevent default to ensure immediate response
+    e.preventDefault();
+    
     // Blur any focused input to dismiss keyboard
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();

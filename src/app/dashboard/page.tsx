@@ -336,7 +336,7 @@ function DashboardContent() {
                         >
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-stone-800 truncate">
-                              {isWaiting ? 'Waiting for player...' : `vs ${game.opponent_username || 'Unknown'}`}
+                              {isWaiting ? 'Waiting for player...' : `w/ ${game.opponent_username || 'Partner'}`}
                             </span>
                             {isWaiting && (
                               <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded">

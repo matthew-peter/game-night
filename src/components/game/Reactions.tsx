@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 
-const REACTIONS = ['👏', '🧠', '😅', '🔥', '😭', '🤞', '❤️'];
+const REACTIONS = ['👏', '🧠', '😅', '🔥', '😭', '🤞', '❤️', '🎉', '😱', '🤔', '👀', '💀', '🙈', '😤', '🥳'];
 
 interface ReactionsProps {
   gameId: string;
@@ -84,15 +84,15 @@ export function Reactions({ gameId, playerId, compact = false }: ReactionsProps)
       {/* Reaction picker */}
       {isOpen && (
         <div className={cn(
-          "absolute right-0 bg-stone-800 rounded-xl p-2 shadow-xl border border-stone-600 flex gap-1 animate-in slide-in-from-top-2 duration-150 z-50",
-          compact ? "top-9" : "top-12"
+          "absolute right-0 bg-stone-800 rounded-xl p-2 shadow-xl border border-stone-600 grid grid-cols-5 gap-1 animate-in slide-in-from-top-2 duration-150 z-50",
+          compact ? "top-9 w-48" : "top-12 w-56"
         )}>
           {REACTIONS.map((emoji) => (
             <button
               key={emoji}
               onClick={() => sendReaction(emoji)}
               className={cn(
-                "hover:bg-stone-700 rounded-lg active:scale-90 transition-transform",
+                "hover:bg-stone-700 rounded-lg active:scale-90 transition-transform flex items-center justify-center",
                 compact ? "w-8 h-8 text-lg" : "w-10 h-10 text-xl"
               )}
             >

@@ -17,6 +17,15 @@ export const metadata: Metadata = {
   title: "Codenames Duet",
   description: "Play Codenames Duet online with a friend",
   manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Codenames",
+  },
+  icons: {
+    icon: "/icon-192.png",
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export const viewport: Viewport = {
