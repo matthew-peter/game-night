@@ -44,6 +44,7 @@ export async function POST(
       timer_tokens: number;
       current_turn: CurrentTurn;
       current_phase: string;
+      current_clue_id: string | null;
       clue_strictness: ClueStrictness;
       sudden_death: boolean;
       player1_agents_found: number;
@@ -178,8 +179,9 @@ export async function POST(
           game_id: id,
           player_id: user.id,
           move_type: 'guess',
-          guessed_word: guessedWord,
-          result: cardType,
+          guess_index: guessIndex,
+          guess_result: cardType,
+          clue_id: game.current_clue_id,
         } as Record<string, unknown>);
 
       if (moveError) {
