@@ -65,13 +65,12 @@ export const useGameStore = create<GameState>((set, get) => ({
     return { moves: [...state.moves, move] };
   }),
   mergeMoves: (incoming) => set((state) => {
-    // Build a map of existing move IDs for fast lookup
-    const existingIds = new Set(state.moves.map(m => m.id));
     // Start with incoming (authoritative order), then append any local-only moves
     // that might have been optimistically added but not yet in DB
+    const incomingIds = new Set(incoming.map(m => m.id));
     const merged = [...incoming];
     for (const m of state.moves) {
-      if (!incoming.some(im => im.id === m.id)) {
+      if (!incomingIds.has(m.id)) {
         // Local-only move (optimistic) — keep it
         merged.push(m);
       }

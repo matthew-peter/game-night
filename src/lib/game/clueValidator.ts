@@ -72,7 +72,7 @@ export function validateClue(
  * Basic word stemming - removes common suffixes
  */
 function getWordRoot(word: string): string {
-  const suffixes = ['ING', 'ED', 'ER', 'EST', 'LY', 'TION', 'SION', 'NESS', 'MENT', 'ABLE', 'IBLE', 'S', 'ES'];
+  const suffixes = ['ING', 'ED', 'ER', 'EST', 'LY', 'TION', 'SION', 'NESS', 'MENT', 'ABLE', 'IBLE', 'ES', 'S'];
   let root = word.toUpperCase();
   
   for (const suffix of suffixes) {

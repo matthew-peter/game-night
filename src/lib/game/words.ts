@@ -79,8 +79,15 @@ export const CODENAMES_WORDS: string[] = [
   "CRAB", "CRACKER", "CRADLE", "CRAYON", "CREAM", "CREEK", "CRIB", "CROCODILE"
 ];
 
-// Function to get random words for a game
+// Function to get random words for a game (Fisher-Yates shuffle for uniform distribution)
 export function getRandomWords(count: number = 25): string[] {
-  const shuffled = [...CODENAMES_WORDS].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, count);
+  const words = [...CODENAMES_WORDS];
+  // Fisher-Yates shuffle
+  for (let i = words.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [words[i], words[j]] = [words[j], words[i]];
+  }
+  // Deduplicate just in case
+  const unique = [...new Set(words)];
+  return unique.slice(0, count);
 }

@@ -41,7 +41,6 @@ function GamePageContent({ gameId }: { gameId: string }) {
   const [playerRole, setPlayerRole] = useState<CurrentTurn | null>(null);
   const [completionSynced, setCompletionSynced] = useState(false);
   const isSubmittingGuess = useRef(false);
-  const autoSkipKey = useRef<string | null>(null);
 
   // ── Sync helpers ──────────────────────────────────────────────────────
   // Refetch game + moves from DB.  Used on visibility change, reconnect,
@@ -236,11 +235,25 @@ function GamePageContent({ gameId }: { gameId: string }) {
 
     const clueNumber = intendedWordIndices.length;
 
-    // Optimistic update: immediately show guess phase
+    // Optimistic update: immediately show guess phase + the clue in moves
     updateGame({
       current_phase: 'guess',
       timer_tokens: Math.max(0, game.timer_tokens - 1),
       sudden_death: game.timer_tokens - 1 <= 0 ? true : game.sudden_death,
+    });
+    // Add an optimistic clue move so the UI shows the clue immediately
+    addMove({
+      id: `optimistic-clue-${Date.now()}`,
+      game_id: game.id,
+      player_id: user.id,
+      move_type: 'clue',
+      clue_word: clue.toLowerCase(),
+      clue_number: clueNumber,
+      intended_words: intendedWordIndices,
+      guess_index: null,
+      guess_result: null,
+      clue_id: null,
+      created_at: new Date().toISOString(),
     });
     clearSelectedWords();
 
@@ -278,7 +291,7 @@ function GamePageContent({ gameId }: { gameId: string }) {
       toast.error('Network error — please try again');
       await syncFromServer();
     }
-  }, [game, user, playerRole, clearSelectedWords, opponent, updateGame, syncFromServer]);
+  }, [game, user, playerRole, clearSelectedWords, opponent, updateGame, addMove, syncFromServer]);
 
   // Handle guessing a word — use API route + optimistic local update
   const handleGuess = useCallback(async (wordIndex: number) => {
@@ -300,18 +313,12 @@ function GamePageContent({ gameId }: { gameId: string }) {
         optimisticUpdates.status = 'completed';
         optimisticUpdates.result = result.won ? 'win' : 'loss';
       } else if (result.turnEnds) {
-        if (game.timer_tokens <= 0 || game.sudden_death) {
-          optimisticUpdates.status = 'completed';
-          optimisticUpdates.result = 'loss';
-        } else {
-          optimisticUpdates.current_turn = playerRole;
-          optimisticUpdates.current_phase = 'clue';
-        }
+        // Bystander hit (non-sudden-death, since processGuess sets gameOver=true for SD bystander)
+        optimisticUpdates.current_turn = playerRole;
+        optimisticUpdates.current_phase = 'clue';
       } else if (game.sudden_death || game.timer_tokens <= 0) {
         // Agent found in sudden death — check if more agents remain on this side
         const clueGiver = game.current_turn;
-        const sideAgents = clueGiver === 'player1'
-          ? game.key_card.player1.agents : game.key_card.player2.agents;
         const tempGame = { ...game, board_state: result.newBoardState };
         const remaining = getRemainingAgentsPerPlayer(tempGame);
         const agentsLeftOnSide = clueGiver === 'player1' ? remaining.player1 : remaining.player2;
@@ -392,69 +399,9 @@ function GamePageContent({ gameId }: { gameId: string }) {
     }
   }, [game, user, playerRole, updateGame, syncFromServer]);
 
-  // Auto-skip clue phase if in sudden death OR clue giver has no agents left
-  useEffect(() => {
-    if (!game || !user || !playerRole || game.status !== 'playing') return;
-    if (game.current_phase !== 'clue') return;
-
-    // Only the current clue giver should trigger the skip
-    if (game.current_turn !== playerRole) return;
-
-    // Prevent firing multiple times for the same turn/phase
-    const skipKey = `${game.current_turn}-${game.current_phase}-${Object.keys(game.board_state.revealed).length}`;
-    if (autoSkipKey.current === skipKey) return;
-
-    const inSuddenDeath = game.timer_tokens <= 0 || game.sudden_death;
-
-    // Check if I have any agents left on my key for partner to guess
-    const remaining = getRemainingAgentsPerPlayer(game);
-    const myRemaining = playerRole === 'player1' ? remaining.player1 : remaining.player2;
-    const theirRemaining = playerRole === 'player1' ? remaining.player2 : remaining.player1;
-
-    const otherPlayer = playerRole === 'player1' ? 'player2' : 'player1';
-
-    if (inSuddenDeath) {
-      autoSkipKey.current = skipKey;
-      // In sudden death, pick the right guesser based on who has agents to find:
-      // - If I have agents on my key (myRemaining > 0), the other player should guess my key
-      //   → current_turn = me, guesser = otherPlayer
-      // - If only they have agents on their key (theirRemaining > 0), I should guess their key
-      //   → current_turn = otherPlayer, guesser = me
-      if (myRemaining > 0) {
-        // Other player guesses my key
-        updateGame({ current_turn: playerRole, current_phase: 'guess' });
-        supabase
-          .from('games')
-          .update({ current_turn: playerRole, current_phase: 'guess' })
-          .eq('id', game.id)
-          .then();
-      } else if (theirRemaining > 0) {
-        // I guess their key
-        updateGame({ current_turn: otherPlayer, current_phase: 'guess' });
-        supabase
-          .from('games')
-          .update({ current_turn: otherPlayer, current_phase: 'guess' })
-          .eq('id', game.id)
-          .then();
-      }
-    } else if (myRemaining === 0) {
-      autoSkipKey.current = skipKey;
-      // I have no agents left - auto-pass to partner to give clue
-      updateGame({ current_turn: otherPlayer, current_phase: 'clue' });
-      supabase.from('moves').insert({
-        game_id: game.id,
-        player_id: user.id,
-        move_type: 'end_turn',
-      }).then(() => {
-        supabase
-          .from('games')
-          .update({ current_turn: otherPlayer, current_phase: 'clue' })
-          .eq('id', game.id)
-          .then();
-      });
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game, user, playerRole]);
+  // Auto-skip is now handled server-side in the move API route.
+  // The API's resolveCluePhase() detects when a clue-giver has no agents
+  // left and auto-switches turns atomically, preventing race conditions.
 
   // ── Final sync when game completes ────────────────────────────────────
   // When the game transitions to 'completed', do one final authoritative
@@ -462,7 +409,13 @@ function GamePageContent({ gameId }: { gameId: string }) {
   // board state—even if our local state was based on optimistic updates.
   useEffect(() => {
     if (game?.status === 'completed' && !completionSynced) {
-      syncFromServer().then(() => setCompletionSynced(true));
+      syncFromServer()
+        .then(() => setCompletionSynced(true))
+        .catch(() => {
+          // If sync fails, still show the review with what we have
+          // rather than hanging on a spinner forever
+          setCompletionSynced(true);
+        });
     }
   }, [game?.status, completionSynced, syncFromServer]);
 
@@ -505,16 +458,27 @@ function GamePageContent({ gameId }: { gameId: string }) {
 
   const isMyTurn = game.current_turn === playerRole;
   
-  // Calculate current clue from moves - only show during guess phase
+  const inSuddenDeath = game.timer_tokens <= 0 || game.sudden_death;
+  
+  // Calculate current clue from moves
+  // In sudden death, there's no new clue per turn — hide the clue display
   const lastClue = moves.filter(m => m.move_type === 'clue').slice(-1)[0] || null;
-  const currentClue = game.current_phase === 'guess' ? lastClue : null;
+  const currentClue = game.current_phase === 'guess' && !inSuddenDeath ? lastClue : null;
   const hasActiveClue = game.current_phase === 'guess' && lastClue !== null;
   
-  // Count guesses this turn (guesses since last clue)
-  const lastClueIndex = moves.map(m => m.move_type).lastIndexOf('clue');
-  const guessCount = lastClueIndex >= 0 
-    ? moves.slice(lastClueIndex + 1).filter(m => m.move_type === 'guess').length 
-    : 0;
+  // Count guesses THIS turn — guesses since the last clue or end_turn move
+  // (In sudden death, turns switch via end_turn moves, not clues)
+  const lastTurnBoundary = (() => {
+    for (let i = moves.length - 1; i >= 0; i--) {
+      if (moves[i].move_type === 'clue' || moves[i].move_type === 'end_turn') {
+        return i;
+      }
+    }
+    return -1;
+  })();
+  const guessCount = lastTurnBoundary >= 0
+    ? moves.slice(lastTurnBoundary + 1).filter(m => m.move_type === 'guess').length
+    : moves.filter(m => m.move_type === 'guess').length;
 
   return (
     <div className="h-dvh bg-gradient-to-b from-stone-800 via-stone-700 to-stone-900 flex flex-col">

@@ -2,8 +2,58 @@ import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { validateClue } from '@/lib/game/clueValidator';
 import { getCardTypeForPlayer } from '@/lib/game/keyGenerator';
-import { isWordRevealed, getNextTurn, getRemainingAgentsPerPlayer } from '@/lib/game/gameLogic';
+import { isWordRevealed, getNextTurn, getRemainingAgentsPerPlayer, countTotalAgentsNeeded } from '@/lib/game/gameLogic';
 import { BoardState, KeyCard, ClueStrictness, CurrentTurn, RevealedCard } from '@/lib/supabase/types';
+
+/**
+ * After a move that transitions to 'clue' phase, check if the new clue-giver
+ * actually has agents left on their key. If not, auto-skip so the game doesn't
+ * get stuck. This runs server-side so both players always see the same result.
+ */
+function resolveCluePhase(
+  updateData: Record<string, unknown>,
+  words: string[],
+  keyCard: KeyCard,
+  boardState: BoardState,
+  newClueGiver: CurrentTurn,
+  inSuddenDeath: boolean
+) {
+  // Build a temporary game-like object to compute remaining agents
+  const tempGame = {
+    words,
+    key_card: keyCard,
+    board_state: boardState,
+  } as Parameters<typeof getRemainingAgentsPerPlayer>[0];
+  const remaining = getRemainingAgentsPerPlayer(tempGame);
+
+  const clueGiverRemaining = newClueGiver === 'player1' ? remaining.player1 : remaining.player2;
+  const otherPlayer = getNextTurn(newClueGiver);
+  const otherRemaining = newClueGiver === 'player1' ? remaining.player2 : remaining.player1;
+
+  if (inSuddenDeath) {
+    // In sudden death, skip straight to guess phase.
+    // Figure out which side still needs guessing.
+    if (clueGiverRemaining > 0) {
+      // The other player should guess my (clue-giver's) key
+      updateData.current_turn = newClueGiver;
+      updateData.current_phase = 'guess';
+    } else if (otherRemaining > 0) {
+      // I (clue-giver) should guess the other player's key
+      updateData.current_turn = otherPlayer;
+      updateData.current_phase = 'guess';
+    }
+    // If both are 0, the game should already be won (handled elsewhere)
+  } else if (clueGiverRemaining === 0) {
+    // Normal play: clue-giver has no agents left → auto-skip to the other player's clue
+    // But first check if the OTHER player also has no agents (shouldn't happen if game isn't won)
+    if (otherRemaining > 0) {
+      updateData.current_turn = otherPlayer;
+      updateData.current_phase = 'clue';
+      // Recursively resolve in case the other player also has 0 (edge case)
+      resolveCluePhase(updateData, words, keyCard, boardState, otherPlayer, inSuddenDeath);
+    }
+  }
+}
 
 export async function POST(
   request: Request,
@@ -74,6 +124,15 @@ export async function POST(
         return NextResponse.json({ error: "It's not your turn to give a clue" }, { status: 400 });
       }
 
+      if (game.current_phase !== 'clue') {
+        return NextResponse.json({ error: 'Not in clue phase' }, { status: 400 });
+      }
+
+      // Cannot give clues in sudden death
+      if (game.sudden_death || game.timer_tokens <= 0) {
+        return NextResponse.json({ error: 'Cannot give clues in sudden death' }, { status: 400 });
+      }
+
       // Validate clue
       const visibleWords = game.words.filter(word => !isWordRevealed(word, game.board_state));
       const validation = validateClue(
@@ -140,6 +199,10 @@ export async function POST(
         return NextResponse.json({ error: "It's not your turn to guess" }, { status: 400 });
       }
 
+      if (game.current_phase !== 'guess') {
+        return NextResponse.json({ error: 'Not in guess phase' }, { status: 400 });
+      }
+
       if (guessIndex === undefined || guessIndex < 0 || guessIndex >= 25) {
         return NextResponse.json({ error: 'Invalid guess index' }, { status: 400 });
       }
@@ -199,7 +262,7 @@ export async function POST(
       
       // Check win by counting agents found
       const agentsFound = Object.values(newBoardState.revealed).filter(r => r.type === 'agent').length;
-      const totalAgentsNeeded = 15; // Codenames Duet has 15 unique agents
+      const totalAgentsNeeded = countTotalAgentsNeeded(game.key_card);
       const won = agentsFound >= totalAgentsNeeded;
       
       const suddenDeath = game.sudden_death || game.timer_tokens <= 0;
@@ -217,8 +280,11 @@ export async function POST(
         updateData.ended_at = new Date().toISOString();
       } else if (cardType !== 'agent') {
         // Wrong guess (bystander) - switch turns (token already deducted when clue was given)
-        updateData.current_turn = getNextTurn(currentTurn);
+        const newClueGiver = getNextTurn(currentTurn);
+        updateData.current_turn = newClueGiver;
         updateData.current_phase = 'clue';
+        // Auto-skip if the new clue-giver has no agents left
+        resolveCluePhase(updateData, game.words, game.key_card, newBoardState, newClueGiver, suddenDeath);
       } else if (suddenDeath) {
         // Agent found in sudden death — check if more agents remain on this side
         // If not, auto-switch so the other player guesses on the remaining side
@@ -262,6 +328,10 @@ export async function POST(
         return NextResponse.json({ error: "It's not your turn" }, { status: 400 });
       }
 
+      if (game.current_phase !== 'guess') {
+        return NextResponse.json({ error: 'Not in guess phase' }, { status: 400 });
+      }
+
       // Create the end turn move
       const { error: moveError } = await supabase
         .from('moves')
@@ -294,10 +364,16 @@ export async function POST(
         }
       }
 
+      const newClueGiver = getNextTurn(currentTurn);
       const updateData: Record<string, unknown> = {
-        current_turn: getNextTurn(currentTurn),
+        current_turn: newClueGiver,
         current_phase: inSuddenDeath ? 'guess' : 'clue',
       };
+
+      // Auto-skip if the new clue-giver has no agents left
+      if (!inSuddenDeath) {
+        resolveCluePhase(updateData, game.words, game.key_card, game.board_state, newClueGiver, false);
+      }
 
       const { error: updateError } = await supabase
         .from('games')

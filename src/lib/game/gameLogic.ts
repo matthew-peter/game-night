@@ -66,6 +66,19 @@ export function processGuess(
   const word = game.words[wordIndex];
   const keyCard = game.key_card;
   
+  // Guard: if already revealed as agent, don't re-process
+  const existingReveal = game.board_state.revealed[word];
+  if (existingReveal && existingReveal.type === 'agent') {
+    // Already found as agent — return a no-op result
+    return {
+      cardType: 'agent',
+      newBoardState: game.board_state,
+      gameOver: false,
+      won: false,
+      turnEnds: false,
+    };
+  }
+  
   // Determine what this card is based on the CURRENT player's key
   // In Duet, the guesser looks at THEIR OWN key to see what their partner knows
   // But the card type is determined by the clue giver's perspective

@@ -42,7 +42,7 @@ export async function POST(
       return NextResponse.json({ error: 'Game is full' }, { status: 400 });
     }
 
-    // Join the game
+    // Join the game — add status + player2_id guards to prevent race conditions
     const { data: updatedGame, error: updateError } = await supabase
       .from('games')
       .update({
@@ -50,6 +50,8 @@ export async function POST(
         status: 'playing',
       })
       .eq('id', id)
+      .eq('status', 'waiting')
+      .is('player2_id', null)
       .select()
       .single();
 

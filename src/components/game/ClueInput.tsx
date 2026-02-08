@@ -93,7 +93,7 @@ export function ClueInput({ game, playerRole, onGiveClue, hasActiveClue = false 
               setError(null);
               broadcastTypingClue();
             }}
-            placeholder="ENTER ONE-WORD CLUE"
+            placeholder="ENTER CLUE"
             className={cn(
               'flex-1 uppercase font-bold text-sm h-10 bg-white/10 border-white/20 text-white placeholder:text-white/40',
               error && 'border-red-500'

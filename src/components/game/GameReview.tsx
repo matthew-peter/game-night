@@ -117,21 +117,33 @@ export function GameReview({ game, moves, playerRole, player1Name, player2Name }
               const revealed = game.board_state.revealed[word];
               
               // Determine display color based on both keys
+              // Priority: shared agent > shared assassin > assassin+agent (split) > single agent > single assassin > bystander
               let bgColor = 'bg-amber-100';
               let textColor = 'text-stone-700';
               
-              if (p1Type === 'agent' && p2Type === 'agent') {
+              const isAgent1 = p1Type === 'agent';
+              const isAgent2 = p2Type === 'agent';
+              const isAssassin1 = p1Type === 'assassin';
+              const isAssassin2 = p2Type === 'assassin';
+              
+              if (isAgent1 && isAgent2) {
+                // Shared agent (green on both sides)
                 bgColor = 'bg-emerald-500';
                 textColor = 'text-white';
-              } else if (p1Type === 'agent' || p2Type === 'agent') {
-                bgColor = 'bg-emerald-300';
-                textColor = 'text-emerald-900';
-              }
-              
-              if (p1Type === 'assassin' && p2Type === 'assassin') {
+              } else if (isAssassin1 && isAssassin2) {
+                // Shared assassin (black on both sides)
                 bgColor = 'bg-stone-900';
                 textColor = 'text-white';
-              } else if (p1Type === 'assassin' || p2Type === 'assassin') {
+              } else if ((isAgent1 && isAssassin2) || (isAssassin1 && isAgent2)) {
+                // Agent on one side, assassin on the other — show split styling
+                bgColor = 'bg-gradient-to-br from-emerald-500 to-stone-800';
+                textColor = 'text-white';
+              } else if (isAgent1 || isAgent2) {
+                // Agent on one side only
+                bgColor = 'bg-emerald-300';
+                textColor = 'text-emerald-900';
+              } else if (isAssassin1 || isAssassin2) {
+                // Assassin on one side only
                 bgColor = 'bg-stone-700';
                 textColor = 'text-white';
               }
@@ -154,9 +166,10 @@ export function GameReview({ game, moves, playerRole, player1Name, player2Name }
           
           {/* Legend */}
           <div className="mt-3 flex flex-wrap gap-3 justify-center text-[10px] text-white/60">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 bg-emerald-500 rounded-sm"/> Shared</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 bg-emerald-500 rounded-sm"/> Shared Agent</span>
             <span className="flex items-center gap-1"><span className="w-2 h-2 bg-emerald-300 rounded-sm"/> Agent</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 bg-stone-700 rounded-sm"/> Assassin</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 bg-stone-900 rounded-sm"/> Assassin</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 bg-gradient-to-br from-emerald-500 to-stone-800 rounded-sm"/> Agent/Assassin</span>
             <span className="flex items-center gap-1"><span className="w-2 h-2 ring-2 ring-white/50 rounded-sm"/> Revealed</span>
           </div>
         </div>

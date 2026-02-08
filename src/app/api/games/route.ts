@@ -37,8 +37,7 @@ export async function POST(request: Request) {
         current_turn: 'player1',
         current_phase: 'clue',
         board_state: {
-          revealed: Array(25).fill(false),
-          revealedBy: Array(25).fill(null),
+          revealed: {},
         },
         player1_agents_found: 0,
         player2_agents_found: 0,
