@@ -39,6 +39,7 @@ function GamePageContent({ gameId }: { gameId: string }) {
   
   const [loading, setLoading] = useState(true);
   const [playerRole, setPlayerRole] = useState<CurrentTurn | null>(null);
+  const [completionSynced, setCompletionSynced] = useState(false);
   const isSubmittingGuess = useRef(false);
   const autoSkipKey = useRef<string | null>(null);
 
@@ -101,6 +102,11 @@ function GamePageContent({ gameId }: { gameId: string }) {
       }
 
       setGame(gameData);
+      
+      // If the game is already completed, mark as synced (we just fetched from DB)
+      if ((gameData as Game).status === 'completed') {
+        setCompletionSynced(true);
+      }
       
       // Determine player role
       if (gameData.player1_id === user.id) {
@@ -331,9 +337,10 @@ function GamePageContent({ gameId }: { gameId: string }) {
         toast.error(data.error || 'Failed to guess');
         await syncFromServer();
       } else {
-        // Sync moves so the game log updates immediately for the guesser
-        // (don't wait for realtime INSERT which can be delayed)
-        await syncMovesFromServer();
+        // Full sync to get authoritative board_state + moves.
+        // This ensures agent counts are correct (not just optimistic)
+        // and is critical when the guess completes the game.
+        await syncFromServer();
       }
     } catch {
       toast.error('Network error — please try again');
@@ -341,7 +348,7 @@ function GamePageContent({ gameId }: { gameId: string }) {
     } finally {
       isSubmittingGuess.current = false;
     }
-  }, [game, user, playerRole, updateGame, syncFromServer, syncMovesFromServer]);
+  }, [game, user, playerRole, updateGame, syncFromServer]);
 
   // Handle ending turn voluntarily — use API route + optimistic update
   const handleEndTurn = useCallback(async () => {
@@ -449,6 +456,16 @@ function GamePageContent({ gameId }: { gameId: string }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game, user, playerRole]);
 
+  // ── Final sync when game completes ────────────────────────────────────
+  // When the game transitions to 'completed', do one final authoritative
+  // sync so that GameReview always shows the correct agent counts and
+  // board state—even if our local state was based on optimistic updates.
+  useEffect(() => {
+    if (game?.status === 'completed' && !completionSynced) {
+      syncFromServer().then(() => setCompletionSynced(true));
+    }
+  }, [game?.status, completionSynced, syncFromServer]);
+
   if (authLoading || loading) {
     return (
       <div className="h-dvh flex items-center justify-center">
@@ -466,8 +483,15 @@ function GamePageContent({ gameId }: { gameId: string }) {
     return null;
   }
 
-  // Show review if game is completed
+  // Show review if game is completed (wait for final sync so counts are correct)
   if (game.status === 'completed') {
+    if (!completionSynced) {
+      return (
+        <div className="h-dvh flex items-center justify-center bg-stone-900">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+        </div>
+      );
+    }
     return (
       <GameReview
         game={game}

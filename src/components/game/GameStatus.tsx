@@ -84,17 +84,15 @@ export function GameStatus({ game, playerRole, opponentName, currentClue, guessC
           
           {/* Timer + Score + Reactions compact */}
           <div className="flex items-center gap-3">
-            <div className="flex gap-0.5">
-              {game.timer_tokens > 0 ? (
-                Array.from({ length: game.timer_tokens }).map((_, i) => (
-                  <div key={i} className="w-2 h-2 rounded-full bg-amber-400" />
-                ))
-              ) : (
-                <div className="w-2 h-2 rounded-full bg-red-500" />
-              )}
+            <div className={cn(
+              'flex items-center gap-1 text-xs font-bold',
+              game.timer_tokens <= 2 ? 'text-red-400' : 'text-amber-400'
+            )}>
+              <span>⏱</span>
+              <span>{game.timer_tokens}</span>
             </div>
-            <div className="text-xs text-white">
-              <span className="text-emerald-400 font-bold">{agentsFound}</span>
+            <div className="text-xs font-bold text-white">
+              <span className="text-emerald-400">{agentsFound}</span>
               <span className="text-stone-400">/{totalAgents}</span>
             </div>
             {userId && (
