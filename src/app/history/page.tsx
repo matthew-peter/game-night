@@ -8,7 +8,6 @@ import { Header } from '@/components/shared/Header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { createClient } from '@/lib/supabase/client';
 import { Game } from '@/lib/supabase/types';
 import { countAgentsFound, countTotalAgentsNeeded } from '@/lib/game/gameLogic';
@@ -81,7 +80,7 @@ function HistoryContent() {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="h-dvh flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
       </div>
     );
@@ -93,10 +92,10 @@ function HistoryContent() {
   }
 
   return (
-    <div className="min-h-screen bg-stone-50">
+    <div className="h-dvh flex flex-col bg-stone-50 overflow-hidden">
       <Header />
       
-      <main className="max-w-lg mx-auto px-4 py-6">
+      <main className="flex-1 overflow-y-auto max-w-lg mx-auto w-full px-4 py-6">
         <div className="flex items-center gap-4 mb-6">
           <Link href="/dashboard">
             <Button variant="ghost" size="icon">
@@ -118,9 +117,8 @@ function HistoryContent() {
             </CardContent>
           </Card>
         ) : (
-          <ScrollArea className="h-[calc(100vh-180px)]">
-            <div className="space-y-3 pr-4">
-              {games.map((game) => {
+          <div className="space-y-3 pb-6">
+            {games.map((game) => {
                 const playerRole = game.player1_id === user.id ? 'player1' : 'player2';
                 const won = game.result === 'win';
                 const agentsFound = countAgentsFound(game.board_state);
@@ -162,8 +160,7 @@ function HistoryContent() {
                   </Link>
                 );
               })}
-            </div>
-          </ScrollArea>
+          </div>
         )}
       </main>
     </div>
