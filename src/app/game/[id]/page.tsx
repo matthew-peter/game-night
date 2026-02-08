@@ -235,25 +235,11 @@ function GamePageContent({ gameId }: { gameId: string }) {
 
     const clueNumber = intendedWordIndices.length;
 
-    // Optimistic update: immediately show guess phase + the clue in moves
+    // Optimistic update: immediately show guess phase
     updateGame({
       current_phase: 'guess',
       timer_tokens: Math.max(0, game.timer_tokens - 1),
       sudden_death: game.timer_tokens - 1 <= 0 ? true : game.sudden_death,
-    });
-    // Add an optimistic clue move so the UI shows the clue immediately
-    addMove({
-      id: `optimistic-clue-${Date.now()}`,
-      game_id: game.id,
-      player_id: user.id,
-      move_type: 'clue',
-      clue_word: clue.toLowerCase(),
-      clue_number: clueNumber,
-      intended_words: intendedWordIndices,
-      guess_index: null,
-      guess_result: null,
-      clue_id: null,
-      created_at: new Date().toISOString(),
     });
     clearSelectedWords();
 
@@ -291,7 +277,7 @@ function GamePageContent({ gameId }: { gameId: string }) {
       toast.error('Network error — please try again');
       await syncFromServer();
     }
-  }, [game, user, playerRole, clearSelectedWords, opponent, updateGame, addMove, syncFromServer]);
+  }, [game, user, playerRole, clearSelectedWords, opponent, updateGame, syncFromServer]);
 
   // Handle guessing a word — use API route + optimistic local update
   const handleGuess = useCallback(async (wordIndex: number) => {
