@@ -15,6 +15,8 @@ interface GameState {
   moves: Move[];
   setMoves: (moves: Move[]) => void;
   addMove: (move: Move) => void;
+  /** Merge moves from a refetch, deduplicating by id, preserving order */
+  mergeMoves: (moves: Move[]) => void;
   
   // Local UI state for clue giving
   selectedWordsForClue: Set<string>;
@@ -52,10 +54,30 @@ export const useGameStore = create<GameState>((set, get) => ({
     game: state.game ? { ...state.game, ...updates } : null
   })),
   
-  // Moves
+  // Moves — deduplicated by id
   moves: [],
   setMoves: (moves) => set({ moves }),
-  addMove: (move) => set((state) => ({ moves: [...state.moves, move] })),
+  addMove: (move) => set((state) => {
+    // Deduplicate: don't add if a move with this id already exists
+    if (state.moves.some(m => m.id === move.id)) {
+      return state;
+    }
+    return { moves: [...state.moves, move] };
+  }),
+  mergeMoves: (incoming) => set((state) => {
+    // Build a map of existing move IDs for fast lookup
+    const existingIds = new Set(state.moves.map(m => m.id));
+    // Start with incoming (authoritative order), then append any local-only moves
+    // that might have been optimistically added but not yet in DB
+    const merged = [...incoming];
+    for (const m of state.moves) {
+      if (!incoming.some(im => im.id === m.id)) {
+        // Local-only move (optimistic) — keep it
+        merged.push(m);
+      }
+    }
+    return { moves: merged };
+  }),
   
   // Selected words for clue
   selectedWordsForClue: new Set<string>(),

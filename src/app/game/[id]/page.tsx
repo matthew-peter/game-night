@@ -13,7 +13,7 @@ import { InlineHistory } from '@/components/game/InlineHistory';
 import { useGameStore } from '@/lib/store/gameStore';
 import { createClient } from '@/lib/supabase/client';
 import { Game, Move, CurrentTurn } from '@/lib/supabase/types';
-import { processGuess, getNextTurn, hasAgentsToClue, getRemainingAgentsPerPlayer } from '@/lib/game/gameLogic';
+import { processGuess, getNextTurn, getRemainingAgentsPerPlayer } from '@/lib/game/gameLogic';
 import { sendTurnNotification } from '@/lib/notifications';
 import { toast } from 'sonner';
 
@@ -31,6 +31,7 @@ function GamePageContent({ gameId }: { gameId: string }) {
     moves,
     setMoves,
     addMove,
+    mergeMoves,
     opponent,
     setOpponent,
     clearSelectedWords,
@@ -41,43 +42,45 @@ function GamePageContent({ gameId }: { gameId: string }) {
   const isSubmittingGuess = useRef(false);
   const autoSkipKey = useRef<string | null>(null);
 
-  // Refetch game state when app becomes visible (for PWA background/foreground)
+  // ── Sync helpers ──────────────────────────────────────────────────────
+  // Refetch game + moves from DB.  Used on visibility change, reconnect,
+  // and periodic poll so we never stay stale for long.
+  const syncFromServer = useCallback(async () => {
+    if (!gameId) return;
+    const [gameRes, movesRes] = await Promise.all([
+      supabase.from('games').select('*').eq('id', gameId).single(),
+      supabase
+        .from('moves')
+        .select('*')
+        .eq('game_id', gameId)
+        .order('created_at', { ascending: true }),
+    ]);
+    if (gameRes.data) setGame(gameRes.data);
+    if (movesRes.data) mergeMoves(movesRes.data);
+  }, [gameId, supabase, setGame, mergeMoves]);
+
+  // Refetch just moves (lighter — used when we know only moves changed)
+  const syncMovesFromServer = useCallback(async () => {
+    if (!gameId) return;
+    const { data } = await supabase
+      .from('moves')
+      .select('*')
+      .eq('game_id', gameId)
+      .order('created_at', { ascending: true });
+    if (data) mergeMoves(data);
+  }, [gameId, supabase, mergeMoves]);
+
+  // ── Visibility change handler (PWA background/foreground) ─────────────
   useEffect(() => {
     if (!gameId || !user) return;
-
-    const handleVisibilityChange = async () => {
+    const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        // Refetch game
-        const { data: gameData } = await supabase
-          .from('games')
-          .select('*')
-          .eq('id', gameId)
-          .single();
-
-        if (gameData) {
-          setGame(gameData);
-        }
-
-        // Refetch moves
-        const { data: movesData } = await supabase
-          .from('moves')
-          .select('*')
-          .eq('game_id', gameId)
-          .order('created_at', { ascending: true });
-
-        if (movesData) {
-          setMoves(movesData);
-        }
+        syncFromServer();
       }
     };
-
     document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameId, user]);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [gameId, user, syncFromServer]);
 
   // Fetch game and set up subscriptions
   useEffect(() => {
@@ -144,6 +147,9 @@ function GamePageContent({ gameId }: { gameId: string }) {
     fetchGame();
 
     // Subscribe to game changes (UPDATE and DELETE)
+    // When a game UPDATE arrives, also refetch moves — they're almost
+    // always correlated and the moves INSERT event may arrive late or
+    // be missed entirely on flaky mobile connections.
     const gameChannel = supabase
       .channel(`game-${gameId}`)
       .on(
@@ -157,6 +163,8 @@ function GamePageContent({ gameId }: { gameId: string }) {
         (payload) => {
           const updatedGame = payload.new as Game;
           setGame(updatedGame);
+          // Also sync moves — the game update likely came with new moves
+          syncMovesFromServer();
         }
       )
       .on(
@@ -172,10 +180,15 @@ function GamePageContent({ gameId }: { gameId: string }) {
           router.push('/dashboard');
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        // On reconnect, do a full sync to catch anything we missed
+        if (status === 'SUBSCRIBED') {
+          syncFromServer();
+        }
+      });
 
-    // Subscribe to moves - only add new moves, don't refetch game
-    // (game updates come through the game channel already)
+    // Subscribe to moves — still useful for fast updates, but no longer
+    // the only path.  addMove deduplicates so double-delivery is safe.
     const movesChannel = supabase
       .channel(`moves-${gameId}`)
       .on(
@@ -193,9 +206,20 @@ function GamePageContent({ gameId }: { gameId: string }) {
       )
       .subscribe();
 
+    // ── Periodic sync (safety net) ──────────────────────────────────────
+    // Every 5 seconds, refetch game + moves.  This catches any realtime
+    // events that were dropped due to network issues.  It's cheap (two
+    // small selects) and eliminates the entire class of "stale UI" bugs.
+    const syncInterval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        syncFromServer();
+      }
+    }, 5000);
+
     return () => {
       supabase.removeChannel(gameChannel);
       supabase.removeChannel(movesChannel);
+      clearInterval(syncInterval);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId, user]);
@@ -228,15 +252,12 @@ function GamePageContent({ gameId }: { gameId: string }) {
       if (!res.ok) {
         const data = await res.json();
         toast.error(data.error || 'Failed to give clue');
-        // Revert optimistic update by refetching
-        const { data: freshGame } = await supabase
-          .from('games')
-          .select('*')
-          .eq('id', game.id)
-          .single();
-        if (freshGame) setGame(freshGame);
+        await syncFromServer();
         return;
       }
+
+      // Sync from server to get authoritative state + the new move
+      await syncFromServer();
 
       // Notify opponent it's their turn to guess
       if (opponent) {
@@ -249,15 +270,9 @@ function GamePageContent({ gameId }: { gameId: string }) {
       }
     } catch {
       toast.error('Network error — please try again');
-      // Revert optimistic update
-      const { data: freshGame } = await supabase
-        .from('games')
-        .select('*')
-        .eq('id', game.id)
-        .single();
-      if (freshGame) setGame(freshGame);
+      await syncFromServer();
     }
-  }, [game, user, playerRole, supabase, clearSelectedWords, opponent, updateGame, setGame]);
+  }, [game, user, playerRole, clearSelectedWords, opponent, updateGame, syncFromServer]);
 
   // Handle guessing a word — use API route + optimistic local update
   const handleGuess = useCallback(async (wordIndex: number) => {
@@ -314,26 +329,19 @@ function GamePageContent({ gameId }: { gameId: string }) {
       if (!res.ok) {
         const data = await res.json();
         toast.error(data.error || 'Failed to guess');
-        // Revert optimistic update
-        const { data: freshGame } = await supabase
-          .from('games')
-          .select('*')
-          .eq('id', game.id)
-          .single();
-        if (freshGame) setGame(freshGame);
+        await syncFromServer();
+      } else {
+        // Sync moves so the game log updates immediately for the guesser
+        // (don't wait for realtime INSERT which can be delayed)
+        await syncMovesFromServer();
       }
     } catch {
       toast.error('Network error — please try again');
-      const { data: freshGame } = await supabase
-        .from('games')
-        .select('*')
-        .eq('id', game.id)
-        .single();
-      if (freshGame) setGame(freshGame);
+      await syncFromServer();
     } finally {
       isSubmittingGuess.current = false;
     }
-  }, [game, user, playerRole, supabase, updateGame, setGame]);
+  }, [game, user, playerRole, updateGame, syncFromServer, syncMovesFromServer]);
 
   // Handle ending turn voluntarily — use API route + optimistic update
   const handleEndTurn = useCallback(async () => {
@@ -369,23 +377,13 @@ function GamePageContent({ gameId }: { gameId: string }) {
       if (!res.ok) {
         const data = await res.json();
         toast.error(data.error || 'Failed to end turn');
-        const { data: freshGame } = await supabase
-          .from('games')
-          .select('*')
-          .eq('id', game.id)
-          .single();
-        if (freshGame) setGame(freshGame);
+        await syncFromServer();
       }
     } catch {
       toast.error('Network error — please try again');
-      const { data: freshGame } = await supabase
-        .from('games')
-        .select('*')
-        .eq('id', game.id)
-        .single();
-      if (freshGame) setGame(freshGame);
+      await syncFromServer();
     }
-  }, [game, user, playerRole, supabase, updateGame, setGame]);
+  }, [game, user, playerRole, updateGame, syncFromServer]);
 
   // Auto-skip clue phase if in sudden death OR clue giver has no agents left
   useEffect(() => {
