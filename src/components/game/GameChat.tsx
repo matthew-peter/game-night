@@ -7,6 +7,8 @@ import { MessageCircle, Send, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
 const MAX_MESSAGE_LENGTH = 60;
+/** How long the peek preview stays visible (ms) */
+const PEEK_DURATION = 4000;
 
 interface ChatMessage {
   id: string;
@@ -40,9 +42,16 @@ export function GameChat({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const [panelPos, setPanelPos] = useState<{ top: number; right: number } | null>(null);
+  const [panelPos, setPanelPos] = useState<{
+    top: number;
+    right: number;
+  } | null>(null);
   const [mounted, setMounted] = useState(false);
   const isOpenRef = useRef(isOpen);
+
+  // ── Peek preview state ────────────────────────────────────────────────
+  const [peekMessage, setPeekMessage] = useState<string | null>(null);
+  const peekTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Keep ref in sync for use in subscription callbacks
   useEffect(() => {
@@ -92,9 +101,12 @@ export function GameChat({
             return [...prev, newMsg];
           });
 
-          // Increment unread if chat is closed and message is from opponent
+          // If message is from opponent and chat is closed:
+          // - increment unread badge
+          // - show peek preview
           if (newMsg.player_id !== playerId && !isOpenRef.current) {
             setUnreadCount((prev) => prev + 1);
+            showPeek(newMsg.text);
           }
         }
       )
@@ -103,7 +115,38 @@ export function GameChat({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [gameId, playerId, supabase]);
+  }, [gameId, playerId, supabase]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Peek preview logic ─────────────────────────────────────────────────
+  const showPeek = useCallback((text: string) => {
+    // Clear any existing peek timer
+    if (peekTimerRef.current) {
+      clearTimeout(peekTimerRef.current);
+    }
+    setPeekMessage(text);
+    peekTimerRef.current = setTimeout(() => {
+      setPeekMessage(null);
+      peekTimerRef.current = null;
+    }, PEEK_DURATION);
+  }, []);
+
+  // Clear peek when opening the panel
+  useEffect(() => {
+    if (isOpen) {
+      setPeekMessage(null);
+      if (peekTimerRef.current) {
+        clearTimeout(peekTimerRef.current);
+        peekTimerRef.current = null;
+      }
+    }
+  }, [isOpen]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (peekTimerRef.current) clearTimeout(peekTimerRef.current);
+    };
+  }, []);
 
   // Auto-scroll to bottom on new messages when panel is open
   useEffect(() => {
@@ -170,7 +213,8 @@ export function GameChat({
       );
     }
 
-    // Send push notification to opponent
+    // Send push notification to opponent (the service worker will
+    // intelligently suppress it if the opponent is already in the app)
     if (opponentId) {
       try {
         await fetch('/api/notify', {
@@ -230,7 +274,37 @@ export function GameChat({
         )}
       </button>
 
-      {/* Chat panel — rendered as a portal with fixed positioning to avoid iOS scroll */}
+      {/* ── Peek preview bubble ─────────────────────────────────────────── */}
+      {peekMessage &&
+        !isOpen &&
+        mounted &&
+        createPortal(
+          <div
+            className="fixed z-[98] pointer-events-none animate-chat-in"
+            style={{
+              // Position near the chat button
+              top: buttonRef.current
+                ? buttonRef.current.getBoundingClientRect().bottom + 6
+                : 80,
+              right: buttonRef.current
+                ? window.innerWidth -
+                  buttonRef.current.getBoundingClientRect().right
+                : 12,
+            }}
+          >
+            <div className="bg-stone-800 border border-stone-600 rounded-lg px-3 py-2 max-w-[200px] shadow-lg animate-chat-fade pointer-events-auto">
+              <div className="text-[10px] text-stone-400 mb-0.5 font-medium">
+                {opponentName}
+              </div>
+              <div className="text-xs text-white break-words leading-snug">
+                {peekMessage}
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+
+      {/* ── Chat panel ─────────────────────────────────────────────────── */}
       {isOpen &&
         mounted &&
         panelPos &&
@@ -248,9 +322,13 @@ export function GameChat({
               {/* Header */}
               <div className="px-3 py-2 border-b border-stone-700 flex items-center justify-between">
                 <span className="text-xs font-semibold text-white">Chat</span>
-                <span className="text-[10px] text-stone-400">
-                  {MAX_MESSAGE_LENGTH} char limit
-                </span>
+                <button
+                  onClick={() => setIsOpen(false)}
+                  className="text-stone-400 hover:text-white transition-colors"
+                  aria-label="Close chat"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
               </div>
 
               {/* Messages */}

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
+import { InAppNotifications } from "@/components/notifications/InAppNotifications";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -49,6 +50,7 @@ export default function RootLayout({
       >
         {children}
         <Toaster position="top-center" />
+        <InAppNotifications />
       </body>
     </html>
   );
