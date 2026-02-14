@@ -42,6 +42,14 @@ export interface LastPlay {
   tilesExchanged?: number;
 }
 
+/**
+ * Dictionary strictness mode:
+ * - 'strict':   Server rejects any word not in the dictionary.
+ * - 'friendly': Server accepts all words. Players can look up words to check.
+ * - 'off':      No dictionary checking at all.
+ */
+export type DictionaryMode = 'strict' | 'friendly' | 'off';
+
 /** The complete Scrabble board state stored in game.board_state */
 export interface ScrabbleBoardState {
   /** 15×15 grid. null = empty cell */
@@ -56,7 +64,10 @@ export interface ScrabbleBoardState {
   /** Scores per player, indexed by seat */
   scores: number[];
 
-  /** Number of consecutive passes (game ends at 2× player count) */
+  /**
+   * Number of consecutive scoreless turns (passes + exchanges).
+   * Game ends after 6 consecutive scoreless turns (standard rule).
+   */
   consecutivePasses: number;
 
   /** Whether any tiles have been placed on the board yet */
@@ -67,6 +78,9 @@ export interface ScrabbleBoardState {
 
   /** Turn number (for display) */
   turnNumber: number;
+
+  /** Dictionary strictness mode */
+  dictionaryMode: DictionaryMode;
 }
 
 /** Scrabble move types */
@@ -88,3 +102,9 @@ export const RACK_SIZE = 7;
 export const CENTER_ROW = 7;
 export const CENTER_COL = 7;
 export const BINGO_BONUS = 50;
+
+/**
+ * Standard Scrabble rule: game ends after 6 consecutive scoreless turns
+ * (any combination of passes and exchanges by any players).
+ */
+export const MAX_SCORELESS_TURNS = 6;

@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useRef } from 'react';
+import { useCallback, useMemo } from 'react';
 import { ScrabbleTile } from './ScrabbleTile';
 import { PlacedTile, TilePlacement, BOARD_SIZE, CENTER_ROW, CENTER_COL, PremiumType } from '@/lib/game/scrabble/types';
 import { getPremium } from '@/lib/game/scrabble/board';
+import { cn } from '@/lib/utils';
 
 interface ScrabbleBoardProps {
   cells: (PlacedTile | null)[][];
@@ -13,18 +14,11 @@ interface ScrabbleBoardProps {
   disabled?: boolean;
 }
 
-const PREMIUM_COLORS: Record<NonNullable<PremiumType>, string> = {
-  TW: 'bg-red-600 text-white',
-  DW: 'bg-pink-300 text-pink-800',
-  TL: 'bg-blue-600 text-white',
-  DL: 'bg-sky-200 text-sky-700',
-};
-
-const PREMIUM_LABELS: Record<NonNullable<PremiumType>, string> = {
-  TW: 'TW',
-  DW: 'DW',
-  TL: 'TL',
-  DL: 'DL',
+const PREMIUM_STYLES: Record<NonNullable<PremiumType>, { bg: string; text: string; label: string }> = {
+  TW: { bg: 'bg-red-600', text: 'text-red-100', label: '3W' },
+  DW: { bg: 'bg-rose-300', text: 'text-rose-700', label: '2W' },
+  TL: { bg: 'bg-blue-500', text: 'text-blue-100', label: '3L' },
+  DL: { bg: 'bg-sky-300', text: 'text-sky-700', label: '2L' },
 };
 
 export function ScrabbleBoard({
@@ -34,8 +28,18 @@ export function ScrabbleBoard({
   onRemovePending,
   disabled = false,
 }: ScrabbleBoardProps) {
-  const boardRef = useRef<HTMLDivElement>(null);
-  const pendingSet = new Set(pendingPlacements.map(p => `${p.row},${p.col}`));
+  const pendingSet = useMemo(
+    () => new Set(pendingPlacements.map(p => `${p.row},${p.col}`)),
+    [pendingPlacements]
+  );
+
+  const pendingMap = useMemo(() => {
+    const m = new Map<string, TilePlacement>();
+    for (const p of pendingPlacements) {
+      m.set(`${p.row},${p.col}`, p);
+    }
+    return m;
+  }, [pendingPlacements]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -45,19 +49,17 @@ export function ScrabbleBoard({
   const handleDrop = useCallback((row: number, col: number, e: React.DragEvent) => {
     e.preventDefault();
     if (disabled) return;
-    if (cells[row][col] !== null) return; // Can't drop on occupied cell
-    if (pendingSet.has(`${row},${col}`)) return; // Already has a pending tile
+    if (cells[row][col] !== null) return;
+    if (pendingSet.has(`${row},${col}`)) return;
     onCellDrop(row, col);
   }, [cells, pendingSet, onCellDrop, disabled]);
 
   const handleCellClick = useCallback((row: number, col: number) => {
     if (disabled) return;
-    // If there's a pending tile here, remove it
     if (pendingSet.has(`${row},${col}`)) {
       onRemovePending(row, col);
       return;
     }
-    // If empty and we have a selected tile from rack, place it
     if (cells[row][col] === null) {
       onCellDrop(row, col);
     }
@@ -66,8 +68,7 @@ export function ScrabbleBoard({
   return (
     <div className="flex justify-center overflow-auto">
       <div
-        ref={boardRef}
-        className="inline-grid gap-[1px] bg-amber-900 p-[1px] rounded-sm"
+        className="inline-grid gap-px bg-stone-900 p-px rounded"
         style={{
           gridTemplateColumns: `repeat(${BOARD_SIZE}, minmax(0, 1fr))`,
         }}
@@ -75,30 +76,28 @@ export function ScrabbleBoard({
         {Array.from({ length: BOARD_SIZE }).map((_, row) =>
           Array.from({ length: BOARD_SIZE }).map((_, col) => {
             const cell = cells[row][col];
-            const pendingTile = pendingPlacements.find(
-              p => p.row === row && p.col === col
-            );
+            const pendingTile = pendingMap.get(`${row},${col}`);
             const premium = getPremium(row, col);
             const isCenter = row === CENTER_ROW && col === CENTER_COL;
+            const isEmpty = !cell && !pendingTile;
 
             return (
               <div
                 key={`${row}-${col}`}
-                className={`
-                  w-[24px] h-[24px] sm:w-[28px] sm:h-[28px] md:w-[32px] md:h-[32px]
-                  flex items-center justify-center relative
-                  ${cell
-                    ? '' // Occupied cell — tile will render on top
-                    : pendingTile
-                      ? '' // Pending tile
-                      : premium
-                        ? PREMIUM_COLORS[premium]
-                        : isCenter
-                          ? 'bg-pink-300'
-                          : 'bg-green-800'
-                  }
-                  ${!cell && !pendingTile && !disabled ? 'cursor-pointer hover:brightness-110' : ''}
-                `}
+                className={cn(
+                  'w-[23px] h-[23px] sm:w-[27px] sm:h-[27px] md:w-[31px] md:h-[31px]',
+                  'flex items-center justify-center relative',
+                  isEmpty && (
+                    premium
+                      ? PREMIUM_STYLES[premium].bg
+                      : isCenter
+                        ? 'bg-rose-300'
+                        : 'bg-emerald-800'
+                  ),
+                  isEmpty && !disabled && 'cursor-pointer hover:brightness-110',
+                  // Occupied cells get a neutral bg so tile sits cleanly
+                  !isEmpty && 'bg-emerald-800',
+                )}
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(row, col, e)}
                 onClick={() => handleCellClick(row, col)}
@@ -122,12 +121,16 @@ export function ScrabbleBoard({
                 ) : (
                   <>
                     {premium && (
-                      <span className="text-[6px] sm:text-[7px] font-bold leading-none opacity-80">
-                        {PREMIUM_LABELS[premium]}
+                      <span className={cn(
+                        'text-[5px] sm:text-[6px] md:text-[7px] font-bold leading-none select-none',
+                        PREMIUM_STYLES[premium].text,
+                        'opacity-90'
+                      )}>
+                        {PREMIUM_STYLES[premium].label}
                       </span>
                     )}
                     {isCenter && !premium && (
-                      <span className="text-[10px] text-pink-700">★</span>
+                      <span className="text-[10px] sm:text-xs text-rose-600 font-bold">★</span>
                     )}
                   </>
                 )}

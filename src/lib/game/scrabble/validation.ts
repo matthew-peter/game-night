@@ -5,10 +5,10 @@
 // - All tiles in a straight line (row or column)
 // - No gaps between placed tiles (accounting for existing tiles)
 // - Connected to existing tiles (or covers center on first move)
-// - All formed words are valid dictionary words
+// - All formed words are valid dictionary words (in strict mode)
 // ============================================================================
 
-import { PlacedTile, TilePlacement, ScrabbleBoardState, BOARD_SIZE, CENTER_ROW, CENTER_COL } from './types';
+import { PlacedTile, TilePlacement, ScrabbleBoardState, DictionaryMode, BOARD_SIZE, CENTER_ROW, CENTER_COL } from './types';
 import { isValidPosition, hasAdjacentTile } from './board';
 import { findFormedWords } from './scoring';
 import { isValidWord } from './dictionary';
@@ -17,16 +17,18 @@ import { getTileValue } from './tiles';
 export interface ValidationResult {
   valid: boolean;
   error?: string;
+  /** Words formed (returned even when invalid, for UI feedback) */
+  invalidWords?: string[];
 }
 
 /**
  * Validate a tile placement move.
- * Returns { valid: true } or { valid: false, error: "..." }.
  */
 export function validatePlacement(
   boardState: ScrabbleBoardState,
   placements: TilePlacement[],
-  playerRack: string[]
+  playerRack: string[],
+  dictionaryMode: DictionaryMode = 'strict'
 ): ValidationResult {
   if (placements.length === 0) {
     return { valid: false, error: 'You must place at least one tile' };
@@ -54,7 +56,7 @@ export function validatePlacement(
     const needed = p.isBlank ? '_' : p.letter;
     const idx = rackCopy.indexOf(needed);
     if (idx === -1) {
-      return { valid: false, error: `You don't have the tile "${p.letter}" in your rack` };
+      return { valid: false, error: `You don't have the tile "${p.isBlank ? 'blank' : p.letter}" in your rack` };
     }
     rackCopy.splice(idx, 1);
   }
@@ -78,7 +80,7 @@ export function validatePlacement(
       const hasPlaced = posSet.has(`${row},${c}`);
       const hasExisting = boardState.cells[row][c] !== null;
       if (!hasPlaced && !hasExisting) {
-        return { valid: false, error: 'There is a gap in your word — tiles must be contiguous' };
+        return { valid: false, error: 'Tiles must be contiguous — no gaps allowed' };
       }
     }
   } else {
@@ -91,26 +93,23 @@ export function validatePlacement(
       const hasPlaced = posSet.has(`${r},${col}`);
       const hasExisting = boardState.cells[r][col] !== null;
       if (!hasPlaced && !hasExisting) {
-        return { valid: false, error: 'There is a gap in your word — tiles must be contiguous' };
+        return { valid: false, error: 'Tiles must be contiguous — no gaps allowed' };
       }
     }
   }
 
   // 6. Check connectivity
   if (!boardState.firstMoveMade) {
-    // First move: must cover center square
     const coversCenter = placements.some(
       p => p.row === CENTER_ROW && p.col === CENTER_COL
     );
     if (!coversCenter) {
       return { valid: false, error: 'First word must cover the center star' };
     }
-    // First move must form a word (at least 2 tiles)
     if (placements.length < 2) {
-      return { valid: false, error: 'First word must be at least 2 letters long' };
+      return { valid: false, error: 'First word must be at least 2 letters' };
     }
   } else {
-    // Subsequent moves: at least one tile must be adjacent to an existing tile
     const touchesExisting = placements.some(p =>
       hasAdjacentTile(boardState.cells, p.row, p.col)
     );
@@ -119,7 +118,7 @@ export function validatePlacement(
     }
   }
 
-  // 7. Build the board with new tiles and check all formed words
+  // 7. Build the board with new tiles and find all formed words
   const testCells = boardState.cells.map(row => [...row]);
   for (const p of placements) {
     const value = p.isBlank ? 0 : getTileValue(p.letter);
@@ -136,11 +135,20 @@ export function validatePlacement(
     return { valid: false, error: 'No valid words formed' };
   }
 
-  // 8. Check all formed words are in the dictionary
+  // 8. Check all formed words against dictionary (in strict mode)
+  const invalidWords: string[] = [];
   for (const fw of formedWords) {
-    if (!isValidWord(fw.word)) {
-      return { valid: false, error: `"${fw.word}" is not a valid word` };
+    if (!isValidWord(fw.word, dictionaryMode)) {
+      invalidWords.push(fw.word);
     }
+  }
+
+  if (invalidWords.length > 0) {
+    return {
+      valid: false,
+      error: `Not in dictionary: ${invalidWords.join(', ')}`,
+      invalidWords,
+    };
   }
 
   return { valid: true };
@@ -155,15 +163,13 @@ export function validateExchange(
   playerRack: string[]
 ): ValidationResult {
   if (tilesToExchange.length === 0) {
-    return { valid: false, error: 'You must select at least one tile to exchange' };
+    return { valid: false, error: 'Select at least one tile to exchange' };
   }
 
-  // Must have enough tiles in the bag (at least 7)
   if (boardState.tileBag.length < 7) {
     return { valid: false, error: 'Not enough tiles in the bag to exchange (need at least 7)' };
   }
 
-  // Check tiles are in rack
   const rackCopy = [...playerRack];
   for (const tile of tilesToExchange) {
     const idx = rackCopy.indexOf(tile);

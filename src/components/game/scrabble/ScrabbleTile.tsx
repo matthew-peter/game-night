@@ -1,6 +1,7 @@
 'use client';
 
 import { getTileValue } from '@/lib/game/scrabble/tiles';
+import { cn } from '@/lib/utils';
 
 interface ScrabbleTileProps {
   letter: string;
@@ -15,6 +16,18 @@ interface ScrabbleTileProps {
   onDragEnd?: (e: React.DragEvent) => void;
   className?: string;
 }
+
+const SIZE_CLASSES = {
+  sm: 'w-[22px] h-[22px] sm:w-[26px] sm:h-[26px] md:w-[30px] md:h-[30px] text-[10px] sm:text-xs',
+  md: 'w-9 h-9 text-sm',
+  lg: 'w-11 h-11 text-base',
+} as const;
+
+const SUBSCRIPT_SIZE = {
+  sm: 'text-[5px] sm:text-[6px]',
+  md: 'text-[8px]',
+  lg: 'text-[10px]',
+} as const;
 
 export function ScrabbleTile({
   letter,
@@ -31,46 +44,41 @@ export function ScrabbleTile({
 }: ScrabbleTileProps) {
   const value = isBlank ? 0 : getTileValue(letter);
 
-  const sizeClasses = {
-    sm: 'w-[22px] h-[22px] text-[10px]',
-    md: 'w-9 h-9 text-sm',
-    lg: 'w-11 h-11 text-base',
-  };
-
-  const subscriptSize = {
-    sm: 'text-[6px]',
-    md: 'text-[8px]',
-    lg: 'text-[10px]',
-  };
-
   return (
     <div
       draggable={!!onDragStart}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       onClick={onClick}
-      className={`
-        ${sizeClasses[size]}
-        relative inline-flex items-center justify-center
-        rounded-sm font-bold uppercase select-none
-        ${isOnBoard
+      className={cn(
+        SIZE_CLASSES[size],
+        'relative inline-flex items-center justify-center select-none',
+        'rounded-[3px] font-bold uppercase',
+        // Tile appearance: warm parchment look
+        isOnBoard
           ? isNewlyPlaced
-            ? 'bg-amber-200 border-amber-400 border shadow-sm'
-            : 'bg-amber-100 border-amber-300 border'
-          : 'bg-amber-100 border-amber-300 border shadow-md hover:shadow-lg'
-        }
-        ${isSelected ? 'ring-2 ring-blue-500 ring-offset-1' : ''}
-        ${isDragging ? 'opacity-50' : ''}
-        ${isBlank ? 'text-red-700' : 'text-stone-800'}
-        ${onClick ? 'cursor-pointer active:scale-95' : ''}
-        ${onDragStart ? 'cursor-grab active:cursor-grabbing' : ''}
-        transition-all duration-100
-        ${className}
-      `}
+            ? 'bg-gradient-to-br from-amber-100 to-amber-200 border border-amber-400 shadow-sm ring-1 ring-amber-400/50'
+            : 'bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200/80'
+          : 'bg-gradient-to-br from-amber-50 to-amber-200 border border-amber-300 shadow-md hover:shadow-lg',
+        // Selection ring
+        isSelected && 'ring-2 ring-blue-500 ring-offset-1 ring-offset-stone-800',
+        // Dragging
+        isDragging && 'opacity-40 scale-95',
+        // Blank tiles in a distinct color
+        isBlank ? 'text-rose-600' : 'text-stone-800',
+        // Interactivity
+        onClick && 'cursor-pointer active:scale-95',
+        onDragStart && 'cursor-grab active:cursor-grabbing',
+        'transition-all duration-100',
+        className
+      )}
     >
-      <span className={isBlank ? 'italic' : ''}>{letter || ''}</span>
+      <span className={cn(isBlank && 'italic', 'leading-none')}>{letter || ''}</span>
       {value > 0 && (
-        <span className={`absolute bottom-0 right-0.5 ${subscriptSize[size]} text-stone-500 font-normal leading-none`}>
+        <span className={cn(
+          'absolute bottom-px right-0.5 font-semibold leading-none text-stone-500',
+          SUBSCRIPT_SIZE[size]
+        )}>
           {value}
         </span>
       )}

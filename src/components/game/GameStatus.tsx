@@ -96,6 +96,7 @@ export function GameStatus({ game, mySeat, opponentName, opponentId, currentClue
                   gameId={game.id}
                   playerId={userId}
                   playerName={userName || 'You'}
+                  otherPlayers={opponentId ? [{ userId: opponentId, name: opponentName || 'Partner' }] : []}
                   opponentId={opponentId}
                   opponentName={opponentName}
                 />

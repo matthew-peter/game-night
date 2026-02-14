@@ -1,16 +1,19 @@
 // ============================================================================
 // Scrabble dictionary / word validation
 //
-// Uses a Set<string> for O(1) lookups. The word list is loaded lazily on
-// first use and cached for the lifetime of the process.
+// This module is safe for both client and server bundles.
+// The full dictionary is loaded server-side only, via loadServerDictionary().
 //
-// Currently ships with a curated list of valid 2–15 letter Scrabble words.
-// To upgrade to a full tournament dictionary (TWL/SOWPODS), replace the
-// WORD_LIST export or load from a file.
+// Supports three modes:
+// - strict:   rejects invalid words during play
+// - friendly: accepts all words, but provides lookup for players
+// - off:      no validation at all
 // ============================================================================
 
-// All valid 2-letter Scrabble words (TWL06 / OSPD5)
-const TWO_LETTER_WORDS = [
+import { DictionaryMode } from './types';
+
+// All valid 2-letter Scrabble words (TWL06 / OSPD5 standard)
+const TWO_LETTER_WORDS = new Set([
   'AA', 'AB', 'AD', 'AE', 'AG', 'AH', 'AI', 'AL', 'AM', 'AN',
   'AR', 'AS', 'AT', 'AW', 'AX', 'AY',
   'BA', 'BE', 'BI', 'BO', 'BY',
@@ -36,88 +39,58 @@ const TWO_LETTER_WORDS = [
   'XI', 'XU',
   'YA', 'YE', 'YO',
   'ZA',
-];
-
-let _dictionary: Set<string> | null = null;
+]);
 
 /**
- * Load the dictionary. Uses a lazily-initialized Set.
- * On the server this is cached across requests (module-level singleton).
+ * The server-side full dictionary. Set via setServerDictionary().
+ * On the client, this stays null and we fall back to the 2-letter list.
  */
+let _serverDictionary: Set<string> | null = null;
+
+/** Called by server-only code to inject the full dictionary. */
+export function setServerDictionary(dict: Set<string>): void {
+  _serverDictionary = dict;
+}
+
+/** Get the current dictionary (full if on server, 2-letter list if on client). */
 function getDictionary(): Set<string> {
-  if (_dictionary) return _dictionary;
-
-  _dictionary = new Set<string>();
-
-  // Add all 2-letter words
-  for (const w of TWO_LETTER_WORDS) {
-    _dictionary.add(w);
-  }
-
-  // The dictionary will be populated from the word list file.
-  // For now, we use a permissive mode that accepts any word >= 2 letters
-  // that passes basic validation, with strict checking for 2-letter words.
-
-  return _dictionary;
+  return _serverDictionary ?? TWO_LETTER_WORDS;
 }
 
 /**
- * Check if a word is valid for Scrabble.
- *
- * Currently uses a PERMISSIVE mode:
- * - 2-letter words must be in the official 2-letter word list
- * - 3+ letter words are accepted if they are alphabetic (no proper nouns)
- *
- * TODO: Load full TWL/SOWPODS dictionary for strict validation
+ * Check if a word is in the dictionary.
+ * Uses the full dictionary on server, 2-letter list on client.
  */
-export function isValidWord(word: string): boolean {
+export function isInDictionary(word: string): boolean {
   if (!word || word.length < 2 || word.length > 15) return false;
-
   const upper = word.toUpperCase();
-
-  // Must be all letters
   if (!/^[A-Z]+$/.test(upper)) return false;
 
-  // 2-letter words must be in the official list
-  if (upper.length === 2) {
-    const dict = getDictionary();
-    return dict.has(upper);
-  }
-
-  // For 3+ letter words: accept in permissive mode
-  // When a full dictionary is loaded, this will check against it
   const dict = getDictionary();
-  if (dict.size > TWO_LETTER_WORDS.length) {
-    // Full dictionary loaded — use strict checking
-    return dict.has(upper);
-  }
-
-  // Permissive mode: accept any alphabetic word >= 3 letters
-  return true;
+  return dict.has(upper);
 }
 
 /**
- * Load a full dictionary from an array of words.
- * Call this at startup to enable strict word validation.
+ * Validate a word based on the dictionary mode.
+ *
+ * - strict:   must be in dictionary
+ * - friendly: always returns true (validation is informational only)
+ * - off:      always returns true
  */
-export function loadDictionary(words: string[]): void {
-  _dictionary = new Set<string>();
+export function isValidWord(word: string, mode: DictionaryMode = 'strict'): boolean {
+  if (!word || word.length < 2 || word.length > 15) return false;
+  const upper = word.toUpperCase();
+  if (!/^[A-Z]+$/.test(upper)) return false;
 
-  // Always include 2-letter words
-  for (const w of TWO_LETTER_WORDS) {
-    _dictionary.add(w);
-  }
+  if (mode === 'off' || mode === 'friendly') return true;
 
-  // Add all provided words
-  for (const w of words) {
-    const upper = w.toUpperCase().trim();
-    if (upper.length >= 2 && upper.length <= 15 && /^[A-Z]+$/.test(upper)) {
-      _dictionary.add(upper);
-    }
-  }
+  return isInDictionary(upper);
 }
 
-/** Get count of words in the dictionary (for debugging) */
+/** Get count of words in the dictionary (for diagnostics). */
 export function getDictionarySize(): number {
   return getDictionary().size;
 }
+
+/** The 2-letter word set, exported for reuse. */
+export { TWO_LETTER_WORDS };

@@ -14,8 +14,9 @@ import {
   ScrabbleBoardState,
   TilePlacement,
   PlacedTile,
-  ScrabbleMoveType,
+  DictionaryMode,
   RACK_SIZE,
+  MAX_SCORELESS_TURNS,
 } from './types';
 import { createEmptyBoard } from './board';
 import { createTileBag, drawTiles, returnTilesToBag, getTileValue } from './tiles';
@@ -28,7 +29,10 @@ import { validatePlacement, validateExchange } from './validation';
  * Create initial Scrabble board state for a new game.
  * Shuffles the bag and deals 7 tiles to each player.
  */
-export function createScrabbleBoardState(playerCount: number): ScrabbleBoardState {
+export function createScrabbleBoardState(
+  playerCount: number,
+  dictionaryMode: DictionaryMode = 'friendly'
+): ScrabbleBoardState {
   const bag = createTileBag();
   const racks: string[][] = [];
 
@@ -44,6 +48,7 @@ export function createScrabbleBoardState(playerCount: number): ScrabbleBoardStat
     consecutivePasses: 0,
     firstMoveMade: false,
     turnNumber: 1,
+    dictionaryMode,
   };
 }
 
@@ -52,6 +57,7 @@ export function createScrabbleBoardState(playerCount: number): ScrabbleBoardStat
 export interface PlaceTilesResult {
   success: boolean;
   error?: string;
+  invalidWords?: string[];
   newBoardState?: ScrabbleBoardState;
   wordsFormed?: { word: string; score: number }[];
   totalScore?: number;
@@ -71,10 +77,19 @@ export function placeTiles(
 ): PlaceTilesResult {
   const rack = boardState.racks[playerSeat];
 
-  // Validate the placement
-  const validation = validatePlacement(boardState, placements, rack);
+  // Validate the placement (uses dictionary mode from board state)
+  const validation = validatePlacement(
+    boardState,
+    placements,
+    rack,
+    boardState.dictionaryMode
+  );
   if (!validation.valid) {
-    return { success: false, error: validation.error };
+    return {
+      success: false,
+      error: validation.error,
+      invalidWords: validation.invalidWords,
+    };
   }
 
   // Apply tiles to the board
@@ -126,6 +141,7 @@ export function placeTiles(
     consecutivePasses: 0, // Reset on successful play
     firstMoveMade: true,
     turnNumber: boardState.turnNumber + 1,
+    dictionaryMode: boardState.dictionaryMode,
     lastPlay: {
       playerSeat,
       type: 'place',
@@ -155,6 +171,7 @@ export interface ExchangeResult {
   error?: string;
   newBoardState?: ScrabbleBoardState;
   nextTurn?: Seat;
+  gameOver?: boolean;
 }
 
 /**
@@ -194,22 +211,35 @@ export function exchangeTiles(
   );
 
   const nextTurn = (playerSeat + 1) % playerCount as Seat;
+  const newConsecutivePasses = boardState.consecutivePasses + 1;
+  const gameOver = newConsecutivePasses >= MAX_SCORELESS_TURNS;
+
+  const newBoardState: ScrabbleBoardState = {
+    ...boardState,
+    tileBag: newBag,
+    racks: newRacks,
+    consecutivePasses: newConsecutivePasses,
+    turnNumber: boardState.turnNumber + 1,
+    lastPlay: {
+      playerSeat,
+      type: 'exchange',
+      tilesExchanged: tilesToExchange.length,
+    },
+  };
+
+  if (gameOver) {
+    // Subtract remaining rack values from each player's score
+    for (let i = 0; i < playerCount; i++) {
+      const rackValue = calculateRackValue(newBoardState.racks[i]);
+      newBoardState.scores[i] -= rackValue;
+    }
+  }
 
   return {
     success: true,
-    newBoardState: {
-      ...boardState,
-      tileBag: newBag,
-      racks: newRacks,
-      consecutivePasses: boardState.consecutivePasses + 1,
-      turnNumber: boardState.turnNumber + 1,
-      lastPlay: {
-        playerSeat,
-        type: 'exchange',
-        tilesExchanged: tilesToExchange.length,
-      },
-    },
+    newBoardState,
     nextTurn,
+    gameOver,
   };
 }
 
@@ -222,7 +252,8 @@ export interface PassResult {
 
 /**
  * Process a pass move.
- * Increments consecutive pass counter. Game ends if all players pass consecutively.
+ * Increments consecutive scoreless turn counter.
+ * Game ends after 6 consecutive scoreless turns (standard Scrabble rule).
  */
 export function passTurn(
   boardState: ScrabbleBoardState,
@@ -230,7 +261,7 @@ export function passTurn(
   playerCount: number
 ): PassResult {
   const newConsecutivePasses = boardState.consecutivePasses + 1;
-  const gameOver = newConsecutivePasses >= playerCount * 2; // Each player passes twice
+  const gameOver = newConsecutivePasses >= MAX_SCORELESS_TURNS;
 
   const nextTurn = (playerSeat + 1) % playerCount as Seat;
 
@@ -264,7 +295,8 @@ export function passTurn(
 
 /**
  * Apply end-game scoring when a player goes out (uses all tiles with empty bag).
- * The player who went out gets the sum of all other players' rack values added to their score.
+ * Standard Scrabble: the player who went out gets the sum of all other
+ * players' remaining rack values added to their score.
  * All other players have their rack values subtracted.
  */
 function applyEndGameScoring(boardState: ScrabbleBoardState, winnerSeat: Seat): void {
@@ -294,11 +326,9 @@ export function getWinners(boardState: ScrabbleBoardState): Seat[] {
 }
 
 /**
- * Check if the game should end due to consecutive passes.
+ * Check if the game should end due to consecutive scoreless turns.
+ * Standard rule: 6 consecutive scoreless turns ends the game.
  */
-export function shouldEndFromPasses(
-  boardState: ScrabbleBoardState,
-  playerCount: number
-): boolean {
-  return boardState.consecutivePasses >= playerCount * 2;
+export function shouldEndFromPasses(boardState: ScrabbleBoardState): boolean {
+  return boardState.consecutivePasses >= MAX_SCORELESS_TURNS;
 }

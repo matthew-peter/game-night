@@ -1,7 +1,7 @@
 'use client';
 
-import { Button } from '@/components/ui/button';
-import { Play, ArrowLeftRight, SkipForward, RotateCcw } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Play, ArrowLeftRight, SkipForward, RotateCcw, Search } from 'lucide-react';
 
 interface ScrabbleActionsProps {
   isMyTurn: boolean;
@@ -13,8 +13,45 @@ interface ScrabbleActionsProps {
   onPass: () => void;
   onRecall: () => void;
   onToggleMode: () => void;
+  onCheckWord?: () => void;
   isSubmitting: boolean;
   tilesInBag: number;
+  dictionaryMode: string;
+}
+
+function ActionButton({
+  onClick,
+  disabled,
+  variant = 'secondary',
+  children,
+  className,
+  title,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+  variant?: 'primary' | 'secondary' | 'muted';
+  children: React.ReactNode;
+  className?: string;
+  title?: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className={cn(
+        'px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all',
+        'disabled:opacity-40 disabled:cursor-not-allowed',
+        'active:scale-95',
+        variant === 'primary' && 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm',
+        variant === 'secondary' && 'bg-stone-700 hover:bg-stone-600 text-stone-200 border border-stone-600',
+        variant === 'muted' && 'bg-stone-700/50 hover:bg-stone-600/50 text-stone-400 border border-stone-700',
+        className
+      )}
+    >
+      {children}
+    </button>
+  );
 }
 
 export function ScrabbleActions({
@@ -27,13 +64,24 @@ export function ScrabbleActions({
   onPass,
   onRecall,
   onToggleMode,
+  onCheckWord,
   isSubmitting,
   tilesInBag,
+  dictionaryMode,
 }: ScrabbleActionsProps) {
   if (!isMyTurn) {
     return (
-      <div className="flex items-center justify-center py-3 px-4 text-stone-400">
-        Waiting for opponent&apos;s turn...
+      <div className="flex items-center justify-center gap-3 py-3 px-4">
+        <div className="flex items-center gap-2 text-stone-400 text-sm">
+          <span className="w-2 h-2 rounded-full bg-stone-500 animate-pulse" />
+          Waiting for opponent&apos;s turn...
+        </div>
+        {dictionaryMode !== 'off' && onCheckWord && (
+          <ActionButton onClick={onCheckWord} variant="muted">
+            <Search className="h-3.5 w-3.5" />
+            Check word
+          </ActionButton>
+        )}
       </div>
     );
   }
@@ -42,74 +90,69 @@ export function ScrabbleActions({
     <div className="flex items-center justify-between gap-2 py-2 px-3">
       {mode === 'play' ? (
         <>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
+          <div className="flex items-center gap-1.5">
+            <ActionButton
               onClick={onRecall}
               disabled={!hasPendingTiles || isSubmitting}
-              className="text-stone-300 border-stone-600"
+              variant="secondary"
             >
-              <RotateCcw className="h-4 w-4 mr-1" />
+              <RotateCcw className="h-3.5 w-3.5" />
               Recall
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
+            </ActionButton>
+            <ActionButton
               onClick={onToggleMode}
               disabled={hasPendingTiles || isSubmitting || tilesInBag < 7}
-              className="text-stone-300 border-stone-600"
+              variant="secondary"
               title={tilesInBag < 7 ? 'Not enough tiles in bag to exchange' : 'Switch to exchange mode'}
             >
-              <ArrowLeftRight className="h-4 w-4 mr-1" />
-              Exchange
-            </Button>
+              <ArrowLeftRight className="h-3.5 w-3.5" />
+              Swap
+            </ActionButton>
+            {dictionaryMode !== 'off' && onCheckWord && (
+              <ActionButton onClick={onCheckWord} variant="muted">
+                <Search className="h-3.5 w-3.5" />
+              </ActionButton>
+            )}
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
+          <div className="flex items-center gap-1.5">
+            <ActionButton
               onClick={onPass}
               disabled={hasPendingTiles || isSubmitting}
-              className="text-stone-400 border-stone-600"
+              variant="muted"
             >
-              <SkipForward className="h-4 w-4 mr-1" />
+              <SkipForward className="h-3.5 w-3.5" />
               Pass
-            </Button>
-            <Button
-              size="sm"
+            </ActionButton>
+            <ActionButton
               onClick={onPlay}
               disabled={!hasPendingTiles || isSubmitting}
-              className="bg-green-600 hover:bg-green-700 text-white"
+              variant="primary"
             >
-              <Play className="h-4 w-4 mr-1" />
+              <Play className="h-3.5 w-3.5" />
               {isSubmitting ? 'Playing...' : 'Play'}
-            </Button>
+            </ActionButton>
           </div>
         </>
       ) : (
         <>
-          <Button
-            variant="outline"
-            size="sm"
+          <ActionButton
             onClick={onToggleMode}
             disabled={isSubmitting}
-            className="text-stone-300 border-stone-600"
+            variant="secondary"
           >
             Cancel
-          </Button>
+          </ActionButton>
           <div className="text-xs text-stone-400">
-            Select tiles to exchange ({selectedRackCount} selected)
+            Select tiles to swap ({selectedRackCount})
           </div>
-          <Button
-            size="sm"
+          <ActionButton
             onClick={onExchange}
             disabled={selectedRackCount === 0 || isSubmitting}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
+            variant="primary"
           >
-            <ArrowLeftRight className="h-4 w-4 mr-1" />
-            {isSubmitting ? 'Exchanging...' : 'Exchange'}
-          </Button>
+            <ArrowLeftRight className="h-3.5 w-3.5" />
+            {isSubmitting ? 'Swapping...' : 'Swap'}
+          </ActionButton>
         </>
       )}
     </div>

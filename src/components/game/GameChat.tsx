@@ -23,10 +23,19 @@ interface ChatMessage {
   created_at: string;
 }
 
+/** A participant in the game (for display names and notifications) */
+interface ChatPlayer {
+  userId: string;
+  name: string;
+}
+
 interface GameChatProps {
   gameId: string;
   playerId: string;
   playerName: string;
+  /** All other players in the game (for multi-player support) */
+  otherPlayers: ChatPlayer[];
+  /** If only one opponent — backward compat with Codenames */
   opponentId?: string;
   opponentName?: string;
 }
@@ -35,8 +44,9 @@ export function GameChat({
   gameId,
   playerId,
   playerName,
+  otherPlayers,
   opponentId,
-  opponentName = 'Partner',
+  opponentName,
 }: GameChatProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [message, setMessage] = useState('');
@@ -51,8 +61,22 @@ export function GameChat({
   const [mounted, setMounted] = useState(false);
   const isOpenRef = useRef(isOpen);
 
+  // Build a name lookup from all players
+  const nameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    map.set(playerId, 'You');
+    for (const p of otherPlayers) {
+      map.set(p.userId, p.name);
+    }
+    // Legacy: single opponent
+    if (opponentId && opponentName) {
+      map.set(opponentId, opponentName);
+    }
+    return map;
+  }, [playerId, otherPlayers, opponentId, opponentName]);
+
   // ── Peek preview state ────────────────────────────────────────────────
-  const [peekMessage, setPeekMessage] = useState<string | null>(null);
+  const [peekMessage, setPeekMessage] = useState<{ sender: string; text: string } | null>(null);
   const peekTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Keep ref in sync for use in subscription callbacks
@@ -96,17 +120,14 @@ export function GameChat({
         (payload) => {
           const newMsg = payload.new as ChatMessage;
           setMessages((prev) => {
-            // Deduplicate (optimistic insert may already have it)
             if (prev.some((m) => m.id === newMsg.id)) return prev;
             return [...prev, newMsg];
           });
 
-          // If message is from opponent and chat is closed:
-          // - increment unread badge
-          // - show peek preview
           if (newMsg.player_id !== playerId && !isOpenRef.current) {
             setUnreadCount((prev) => prev + 1);
-            showPeek(newMsg.text);
+            const senderName = nameMap.get(newMsg.player_id) ?? 'Player';
+            showPeek(senderName, newMsg.text);
           }
         }
       )
@@ -115,19 +136,18 @@ export function GameChat({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [gameId, playerId, supabase]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [gameId, playerId, supabase, nameMap]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Peek preview logic ─────────────────────────────────────────────────
-  const showPeek = useCallback((text: string) => {
+  const showPeek = useCallback((sender: string, text: string) => {
     if (peekTimerRef.current) clearTimeout(peekTimerRef.current);
-    setPeekMessage(text);
+    setPeekMessage({ sender, text });
     peekTimerRef.current = setTimeout(() => {
       setPeekMessage(null);
       peekTimerRef.current = null;
     }, PEEK_DURATION);
   }, []);
 
-  // Clear peek when opening the panel
   useEffect(() => {
     if (isOpen) {
       setPeekMessage(null);
@@ -138,33 +158,23 @@ export function GameChat({
     }
   }, [isOpen]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (peekTimerRef.current) clearTimeout(peekTimerRef.current);
     };
   }, []);
 
-  // Auto-scroll to bottom on new messages when panel is open
   useEffect(() => {
     if (isOpen) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, isOpen]);
 
-  // Clear unread when opening chat
   useEffect(() => {
     if (isOpen) setUnreadCount(0);
   }, [isOpen]);
 
   // ── Visual viewport tracking for keyboard ──────────────────────────
-  // The chat panel is portaled to document.body and positioned fixed at
-  // the bottom of the screen.  On iOS, the keyboard reduces the visual
-  // viewport but fixed elements stay at layout-viewport coordinates —
-  // meaning the input goes BEHIND the keyboard.
-  //
-  // We listen to visualViewport and push the panel up by the keyboard
-  // height, keeping the input always visible and accessible.
   useEffect(() => {
     if (!isOpen) return;
     const vv = window.visualViewport;
@@ -174,8 +184,6 @@ export function GameChat({
     const update = () => {
       const offset = window.innerHeight - vv.height - vv.offsetTop;
       el.style.bottom = `${Math.max(0, offset)}px`;
-      // Also constrain panel height so it doesn't extend above the
-      // visible area when the keyboard is open.
       el.style.setProperty(
         '--chat-max-h',
         `${Math.min(400, vv.height * 0.65)}px`
@@ -201,7 +209,6 @@ export function GameChat({
     const optimisticId = crypto.randomUUID();
     const now = new Date().toISOString();
 
-    // Optimistic local add
     const optimisticMsg: ChatMessage = {
       id: optimisticId,
       game_id: gameId,
@@ -212,7 +219,6 @@ export function GameChat({
     setMessages((prev) => [...prev, optimisticMsg]);
     setMessage('');
 
-    // Insert into DB (realtime will deliver to both players)
     const { data, error } = await supabase
       .from('chat_messages')
       .insert({
@@ -224,28 +230,29 @@ export function GameChat({
       .single();
 
     if (error) {
-      // Remove optimistic message on failure
       setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
       return;
     }
 
-    // Replace optimistic ID with real ID
     if (data) {
       setMessages((prev) =>
         prev.map((m) => (m.id === optimisticId ? { ...m, id: data.id } : m))
       );
     }
 
-    // Send push notification to opponent (the service worker will
-    // intelligently suppress it if the opponent is already in the app)
-    if (opponentId) {
+    // Send push notification to all other players
+    const recipients = otherPlayers.length > 0
+      ? otherPlayers
+      : opponentId ? [{ userId: opponentId, name: opponentName ?? 'Player' }] : [];
+
+    for (const recipient of recipients) {
       try {
         await fetch('/api/notify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             gameId,
-            userId: opponentId,
+            userId: recipient.userId,
             message: `${playerName}: ${msgText}`,
             title: 'New Message',
           }),
@@ -254,7 +261,7 @@ export function GameChat({
         // Notification failure is non-critical
       }
     }
-  }, [message, gameId, playerId, playerName, opponentId, supabase]);
+  }, [message, gameId, playerId, playerName, otherPlayers, opponentId, opponentName, supabase]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -267,7 +274,9 @@ export function GameChat({
   );
 
   const getSenderName = (senderId: string) =>
-    senderId === playerId ? 'You' : opponentName;
+    nameMap.get(senderId) ?? 'Player';
+
+  const chatTitle = otherPlayers.length > 1 ? 'Game Chat' : `Chat with ${opponentName || otherPlayers[0]?.name || 'Player'}`;
 
   return (
     <>
@@ -314,10 +323,10 @@ export function GameChat({
           >
             <div className="bg-stone-800 border border-stone-600 rounded-lg px-3 py-2 max-w-[200px] shadow-lg animate-chat-fade pointer-events-auto">
               <div className="text-[10px] text-stone-400 mb-0.5 font-medium">
-                {opponentName}
+                {peekMessage.sender}
               </div>
               <div className="text-xs text-white break-words leading-snug">
-                {peekMessage}
+                {peekMessage.text}
               </div>
             </div>
           </div>,
@@ -325,24 +334,15 @@ export function GameChat({
         )}
 
       {/* ── Bottom sheet chat panel ─────────────────────────────────────── */}
-      {/*
-        This is a full-width bottom sheet instead of a cramped dropdown.
-        Positioning it at the bottom:
-        - Puts the input near where the keyboard appears (natural on mobile)
-        - Gives more room for messages (up to 400px / 65% of visual viewport)
-        - The visualViewport effect pushes it above the keyboard when open
-      */}
       {isOpen &&
         mounted &&
         createPortal(
           <>
-            {/* Backdrop — semi-transparent so the game board is still visible */}
             <div
               className="fixed inset-0 z-[99] bg-black/30"
               onClick={() => setIsOpen(false)}
             />
 
-            {/* Panel wrapper — positioned fixed at bottom, adjusted by vv effect */}
             <div
               ref={chatPanelRef}
               className="fixed left-0 right-0 bottom-0 z-[100] animate-chat-sheet-up"
@@ -356,7 +356,7 @@ export function GameChat({
                 {/* Header */}
                 <div className="px-4 py-3 border-b border-stone-700 flex items-center justify-between shrink-0">
                   <span className="text-sm font-semibold text-white">
-                    Chat with {opponentName}
+                    {chatTitle}
                   </span>
                   <button
                     onClick={() => setIsOpen(false)}

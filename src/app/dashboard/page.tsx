@@ -46,6 +46,7 @@ function DashboardContent() {
   const [allowWordSwaps, setAllowWordSwaps] = useState(true);
   const [maxWordSwaps, setMaxWordSwaps] = useState(3);
   const [scrabbleMaxPlayers, setScrabbleMaxPlayers] = useState(2);
+  const [scrabbleDictionaryMode, setScrabbleDictionaryMode] = useState<'strict' | 'friendly' | 'off'>('friendly');
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   // Fetch active games
@@ -183,7 +184,7 @@ function DashboardContent() {
 
       if (gameType === 'scrabble') {
         const maxPlayers = scrabbleMaxPlayers;
-        const boardState = createScrabbleBoardState(maxPlayers);
+        const boardState = createScrabbleBoardState(maxPlayers, scrabbleDictionaryMode);
 
         gameInsert = {
           id: gameId,
@@ -466,7 +467,7 @@ function DashboardContent() {
                             <span className="font-medium text-stone-800 truncate">
                               {isWaiting
                                 ? 'Waiting for players...'
-                                : `w/ ${opponentNames.join(', ') || 'Opponents'}`}
+                                : `w/ ${opponentNames.join(', ') || 'players'}`}
                             </span>
                             {isWaiting && (
                               <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded">
@@ -574,7 +575,7 @@ function DashboardContent() {
 
                     {/* Scrabble Settings */}
                     {gameType === 'scrabble' && (
-                      <div className="space-y-3">
+                      <div className="space-y-4">
                         <div className="space-y-2">
                           <Label>Number of Players: {scrabbleMaxPlayers}</Label>
                           <Slider
@@ -587,6 +588,36 @@ function DashboardContent() {
                           />
                           <p className="text-xs text-stone-500">
                             Game starts when {scrabbleMaxPlayers} players have joined.
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Dictionary Rules</Label>
+                          <Select
+                            value={scrabbleDictionaryMode}
+                            onValueChange={(v) => setScrabbleDictionaryMode(v as 'strict' | 'friendly' | 'off')}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="friendly">
+                                Friendly &mdash; play any word, look up to check
+                              </SelectItem>
+                              <SelectItem value="strict">
+                                Strict &mdash; only dictionary words accepted
+                              </SelectItem>
+                              <SelectItem value="off">
+                                No rules &mdash; any word goes
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-stone-500">
+                            {scrabbleDictionaryMode === 'friendly'
+                              ? 'Words are accepted on the honor system. Use the word checker to look up disputed words.'
+                              : scrabbleDictionaryMode === 'strict'
+                                ? 'The server will reject words not found in the dictionary.'
+                                : 'Play anything. No dictionary checking available.'}
                           </p>
                         </div>
                       </div>
@@ -647,7 +678,7 @@ function DashboardContent() {
                                 Me (game creator)
                               </SelectItem>
                               <SelectItem value="joiner">
-                                My partner (who joins)
+                                The other player (who joins)
                               </SelectItem>
                               <SelectItem value="random">
                                 Random

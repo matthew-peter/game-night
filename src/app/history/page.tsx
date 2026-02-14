@@ -69,7 +69,7 @@ function HistoryContent() {
   if (authLoading || loading) {
     return (
       <div className="h-dvh flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-stone-600"></div>
       </div>
     );
   }
@@ -98,7 +98,7 @@ function HistoryContent() {
             <CardContent className="py-12 text-center">
               <p className="text-stone-500">No completed games yet</p>
               <Link href="/dashboard">
-                <Button className="mt-4 bg-green-600 hover:bg-green-700">
+                <Button className="mt-4 bg-stone-700 hover:bg-stone-600">
                   Start a Game
                 </Button>
               </Link>
@@ -137,7 +137,7 @@ function HistoryContent() {
                               <Clock className="h-5 w-5 text-stone-400" />
                             )}
                             <span className="font-medium">
-                              vs {opponentNames.join(', ') || 'Opponents'}
+                              vs {opponentNames.join(', ') || 'players'}
                             </span>
                           </div>
                           <Badge variant={iWon ? 'default' : 'secondary'} className={iWon ? 'bg-amber-600' : ''}>

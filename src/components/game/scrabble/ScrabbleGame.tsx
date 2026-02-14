@@ -7,12 +7,15 @@ import { ScrabbleScoreboard } from './ScrabbleScoreboard';
 import { ScrabbleActions } from './ScrabbleActions';
 import { BlankTileDialog } from './BlankTileDialog';
 import { LastPlayInfo } from './LastPlayInfo';
+import { WordChecker } from './WordChecker';
 import { Header } from '@/components/shared/Header';
-import { Game, Seat, GamePlayer, findSeat, getOtherPlayers } from '@/lib/supabase/types';
-import { ScrabbleBoardState, TilePlacement } from '@/lib/game/scrabble/types';
-import { createClient } from '@/lib/supabase/client';
+import { GameChat } from '@/components/game/GameChat';
+import { Game, Seat, GamePlayer, getOtherPlayers } from '@/lib/supabase/types';
+import { ScrabbleBoardState, TilePlacement, DictionaryMode } from '@/lib/game/scrabble/types';
 import { sendTurnNotification } from '@/lib/notifications';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+import { Trophy, RotateCcw } from 'lucide-react';
 
 interface ScrabbleGameProps {
   game: Game;
@@ -33,12 +36,23 @@ export function ScrabbleGame({
   const isMyTurn = game.current_turn === mySeat;
   const myRack = boardState.racks[mySeat] ?? [];
   const opponents = useMemo(() => getOtherPlayers(players, user.id), [players, user.id]);
+  const dictionaryMode: DictionaryMode = boardState.dictionaryMode ?? 'friendly';
+
+  // Chat player list
+  const chatOtherPlayers = useMemo(
+    () => opponents.map(p => ({
+      userId: p.user_id,
+      name: p.user?.username ?? `Player ${p.seat + 1}`,
+    })),
+    [opponents]
+  );
 
   // UI state
   const [pendingPlacements, setPendingPlacements] = useState<TilePlacement[]>([]);
   const [selectedRackIndices, setSelectedRackIndices] = useState<Set<number>>(new Set());
   const [mode, setMode] = useState<'play' | 'exchange'>('play');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [wordCheckerOpen, setWordCheckerOpen] = useState(false);
   const [blankDialog, setBlankDialog] = useState<{
     open: boolean;
     rackIndex: number;
@@ -46,7 +60,6 @@ export function ScrabbleGame({
     targetCol: number;
   }>({ open: false, rackIndex: -1, targetRow: -1, targetCol: -1 });
 
-  // Track which rack tile is being dragged
   const dragTileIndex = useRef<number | null>(null);
 
   // Reset pending state when turn changes
@@ -60,7 +73,6 @@ export function ScrabbleGame({
   const availableRackTiles = useMemo(() => {
     const usedIndices = new Set<number>();
     for (const p of pendingPlacements) {
-      // Find the rack index used for this placement
       const rackIdx = findRackIndexForPlacement(myRack, p, usedIndices);
       if (rackIdx !== -1) usedIndices.add(rackIdx);
     }
@@ -81,7 +93,6 @@ export function ScrabbleGame({
     if (!tile) return;
 
     if (tile === '_') {
-      // Blank tile — show letter picker
       setBlankDialog({ open: true, rackIndex, targetRow: row, targetCol: col });
       return;
     }
@@ -94,7 +105,7 @@ export function ScrabbleGame({
   }, [myRack]);
 
   const handleBlankLetterSelected = useCallback((letter: string) => {
-    const { rackIndex, targetRow, targetCol } = blankDialog;
+    const { targetRow, targetCol } = blankDialog;
     setPendingPlacements(prev => [
       ...prev,
       { row: targetRow, col: targetCol, letter, isBlank: true },
@@ -105,18 +116,15 @@ export function ScrabbleGame({
 
   // ── Handle cell drop (from drag or click) ─────────────────────────────
   const handleCellDrop = useCallback((row: number, col: number) => {
-    let rackIndex: number;
+    let rackIndex: number | undefined;
 
     if (dragTileIndex.current !== null) {
-      // From drag
       rackIndex = displayedRackTiles[dragTileIndex.current]?.originalIndex;
       dragTileIndex.current = null;
     } else if (selectedRackIndices.size === 1) {
-      // From click selection
       const selectedDisplayIdx = selectedRackIndices.values().next().value;
       rackIndex = displayedRackTiles[selectedDisplayIdx!]?.originalIndex;
     } else {
-      // Pick first available tile
       const firstAvailable = displayedRackTiles[0];
       if (!firstAvailable) return;
       rackIndex = firstAvailable.originalIndex;
@@ -126,14 +134,12 @@ export function ScrabbleGame({
     placeTileOnBoard(row, col, rackIndex);
   }, [displayedRackTiles, selectedRackIndices, placeTileOnBoard]);
 
-  // ── Remove a pending tile from the board ──────────────────────────────
   const handleRemovePending = useCallback((row: number, col: number) => {
     setPendingPlacements(prev =>
       prev.filter(p => !(p.row === row && p.col === col))
     );
   }, []);
 
-  // ── Recall all pending tiles ──────────────────────────────────────────
   const handleRecall = useCallback(() => {
     setPendingPlacements([]);
     setSelectedRackIndices(new Set());
@@ -149,7 +155,6 @@ export function ScrabbleGame({
         return next;
       });
     } else {
-      // Toggle selection
       setSelectedRackIndices(prev => {
         if (prev.has(displayIndex) && prev.size === 1) return new Set();
         return new Set([displayIndex]);
@@ -160,7 +165,6 @@ export function ScrabbleGame({
   const handleDragStart = useCallback((displayIndex: number, e: React.DragEvent) => {
     dragTileIndex.current = displayIndex;
     e.dataTransfer.effectAllowed = 'move';
-    // Set some data so the drop event fires
     e.dataTransfer.setData('text/plain', String(displayIndex));
   }, []);
 
@@ -195,7 +199,6 @@ export function ScrabbleGame({
       setSelectedRackIndices(new Set());
       onGameUpdated();
 
-      // Notify opponents
       for (const opp of opponents) {
         sendTurnNotification(
           game.id,
@@ -216,9 +219,9 @@ export function ScrabbleGame({
     if (selectedRackIndices.size === 0 || isSubmitting) return;
     setIsSubmitting(true);
 
-    const tilesToExchange = Array.from(selectedRackIndices).map(
-      displayIdx => displayedRackTiles[displayIdx]?.letter
-    ).filter(Boolean);
+    const tilesToExchange = Array.from(selectedRackIndices)
+      .map(displayIdx => displayedRackTiles[displayIdx]?.letter)
+      .filter((l): l is string => !!l);
 
     try {
       const res = await fetch(`/api/games/${game.id}/scrabble-move`, {
@@ -297,32 +300,75 @@ export function ScrabbleGame({
   // ── Game over view ────────────────────────────────────────────────────
   if (game.status === 'completed') {
     const maxScore = Math.max(...boardState.scores);
-    const winners = boardState.scores
+    const winnerSeats = boardState.scores
       .map((score, seat) => ({ score, seat }))
       .filter(({ score }) => score === maxScore);
 
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-stone-800 via-stone-700 to-stone-900 flex flex-col overflow-hidden">
+      <div className="fixed inset-0 bg-gradient-to-b from-stone-900 via-stone-800 to-stone-900 flex flex-col overflow-hidden">
         <Header />
-        <div className="flex-1 overflow-y-auto px-2 py-4 space-y-3">
-          <div className="text-center py-4">
-            <h2 className="text-2xl font-bold text-amber-400 mb-2">Game Over!</h2>
-            <div className="space-y-1">
-              {boardState.scores.map((score, seat) => {
-                const p = players.find(pl => pl.seat === seat);
-                const name = p?.user_id === user.id ? 'You' : p?.user?.username ?? `Player ${seat + 1}`;
-                const isWinner = score === maxScore;
-                return (
-                  <div
-                    key={seat}
-                    className={`text-lg ${isWinner ? 'text-amber-300 font-bold' : 'text-stone-400'}`}
-                  >
-                    {name}: {score} {isWinner ? '🏆' : ''}
-                  </div>
-                );
-              })}
+
+        <div className="flex-1 overflow-y-auto px-3 py-4">
+          {/* Results card */}
+          <div className="max-w-md mx-auto mb-4">
+            <div className="bg-stone-800 rounded-xl border border-stone-700 p-5 text-center space-y-4">
+              <div className="flex items-center justify-center gap-2">
+                <Trophy className="w-6 h-6 text-amber-400" />
+                <h2 className="text-xl font-bold text-white">Game Over</h2>
+              </div>
+
+              <div className="space-y-2">
+                {boardState.scores
+                  .map((score, seat) => ({ score, seat }))
+                  .sort((a, b) => b.score - a.score)
+                  .map(({ score, seat }) => {
+                    const p = players.find(pl => pl.seat === seat);
+                    const name = p?.user_id === user.id ? 'You' : p?.user?.username ?? `Player ${seat + 1}`;
+                    const isWinner = score === maxScore;
+                    const isMe = p?.user_id === user.id;
+
+                    return (
+                      <div
+                        key={seat}
+                        className={cn(
+                          'flex items-center justify-between px-4 py-2.5 rounded-lg',
+                          isWinner
+                            ? 'bg-amber-600/20 border border-amber-500/40'
+                            : 'bg-stone-700/50'
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          {isWinner && <span className="text-amber-400">1st</span>}
+                          <span className={cn(
+                            'font-semibold',
+                            isWinner ? 'text-amber-300' : 'text-stone-300',
+                            isMe && 'underline decoration-amber-500/50'
+                          )}>
+                            {name}
+                          </span>
+                        </div>
+                        <span className={cn(
+                          'font-bold tabular-nums text-lg',
+                          isWinner ? 'text-amber-400' : 'text-stone-400'
+                        )}>
+                          {score}
+                        </span>
+                      </div>
+                    );
+                  })}
+              </div>
+
+              <a
+                href="/dashboard"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-stone-700 hover:bg-stone-600 text-stone-200 rounded-lg text-sm font-medium transition-colors"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Back to Dashboard
+              </a>
             </div>
           </div>
+
+          {/* Final board */}
           <ScrabbleBoard
             cells={boardState.cells}
             pendingPlacements={[]}
@@ -335,17 +381,30 @@ export function ScrabbleGame({
     );
   }
 
+  // ── Active game ───────────────────────────────────────────────────────
   return (
-    <div className="fixed inset-0 bg-gradient-to-b from-stone-800 via-stone-700 to-stone-900 flex flex-col overflow-hidden">
+    <div className="fixed inset-0 bg-gradient-to-b from-stone-900 via-stone-800 to-stone-900 flex flex-col overflow-hidden">
       <Header />
 
-      <ScrabbleScoreboard
-        boardState={boardState}
-        players={players}
-        currentTurn={game.current_turn}
-        mySeat={mySeat}
-        userId={user.id}
-      />
+      {/* Scoreboard with chat button */}
+      <div className="relative">
+        <ScrabbleScoreboard
+          boardState={boardState}
+          players={players}
+          currentTurn={game.current_turn}
+          mySeat={mySeat}
+          userId={user.id}
+        />
+        {/* Chat button - positioned absolutely in top-right of scoreboard */}
+        <div className="absolute right-2 top-1/2 -translate-y-1/2">
+          <GameChat
+            gameId={game.id}
+            playerId={user.id}
+            playerName={user.username}
+            otherPlayers={chatOtherPlayers}
+          />
+        </div>
+      </div>
 
       {boardState.lastPlay && (
         <LastPlayInfo
@@ -390,8 +449,10 @@ export function ScrabbleGame({
             setSelectedRackIndices(new Set());
             setPendingPlacements([]);
           }}
+          onCheckWord={() => setWordCheckerOpen(true)}
           isSubmitting={isSubmitting}
           tilesInBag={boardState.tileBag.length}
+          dictionaryMode={dictionaryMode}
         />
       </div>
 
@@ -400,13 +461,17 @@ export function ScrabbleGame({
         onSelect={handleBlankLetterSelected}
         onCancel={() => setBlankDialog({ open: false, rackIndex: -1, targetRow: -1, targetCol: -1 })}
       />
+
+      <WordChecker
+        open={wordCheckerOpen}
+        onClose={() => setWordCheckerOpen(false)}
+      />
     </div>
   );
 }
 
 // ── Helper ─────────────────────────────────────────────────────────────────
 
-/** Find which rack index was used for a given pending placement */
 function findRackIndexForPlacement(
   rack: string[],
   placement: TilePlacement,

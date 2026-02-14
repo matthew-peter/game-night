@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { ScrabbleTile } from './ScrabbleTile';
-import { TileLetter } from '@/lib/game/scrabble/types';
+import { TileLetter, RACK_SIZE } from '@/lib/game/scrabble/types';
 
 interface TileRackProps {
   tiles: TileLetter[];
@@ -36,7 +36,7 @@ export function TileRack({
   };
 
   return (
-    <div className="flex items-center justify-center gap-1 py-2 px-3 bg-amber-900/80 rounded-lg">
+    <div className="flex items-center justify-center gap-1.5 py-2.5 px-4 bg-amber-900/60 rounded-xl border border-amber-800/40">
       {tiles.map((tile, index) => {
         const isBlank = tile === '_';
         const isSelected = selectedIndices.has(index);
@@ -44,7 +44,7 @@ export function TileRack({
 
         return (
           <ScrabbleTile
-            key={`${index}-${tile}`}
+            key={`rack-${index}-${tile}-${isSelected}`}
             letter={isBlank ? '' : tile}
             isBlank={isBlank}
             isSelected={isSelected}
@@ -56,11 +56,11 @@ export function TileRack({
           />
         );
       })}
-      {/* Fill empty slots */}
-      {Array.from({ length: Math.max(0, 7 - tiles.length) }).map((_, i) => (
+      {/* Fill empty slots to maintain consistent rack width */}
+      {Array.from({ length: Math.max(0, RACK_SIZE - tiles.length) }).map((_, i) => (
         <div
           key={`empty-${i}`}
-          className="w-11 h-11 rounded-sm border-2 border-dashed border-amber-700/40"
+          className="w-11 h-11 rounded-[3px] border-2 border-dashed border-amber-700/30"
         />
       ))}
     </div>

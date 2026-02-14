@@ -23,7 +23,10 @@ export async function POST(request: Request) {
 
     if (gameType === 'scrabble') {
       const maxPlayers = Math.min(Math.max(body.maxPlayers ?? 2, 2), 4);
-      const boardState = createScrabbleBoardState(maxPlayers);
+      const dictionaryMode = ['strict', 'friendly', 'off'].includes(body.dictionaryMode)
+        ? body.dictionaryMode
+        : 'friendly';
+      const boardState = createScrabbleBoardState(maxPlayers, dictionaryMode);
 
       gameInsert = {
         game_type: 'scrabble',

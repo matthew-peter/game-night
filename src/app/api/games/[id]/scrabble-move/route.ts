@@ -1,14 +1,18 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { Seat } from '@/lib/supabase/types';
-import { ScrabbleBoardState, TilePlacement } from '@/lib/game/scrabble/types';
+import { ScrabbleBoardState, TilePlacement, MAX_SCORELESS_TURNS } from '@/lib/game/scrabble/types';
 import { placeTiles, exchangeTiles, passTurn } from '@/lib/game/scrabble/logic';
+import { loadServerDictionary } from '@/lib/game/scrabble/dictionary-server';
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Load the full dictionary for word validation
+    loadServerDictionary();
+
     const { id } = await params;
     const supabase = await createClient();
 
@@ -72,7 +76,10 @@ export async function POST(
       const result = placeTiles(boardState, placements, mySeat, playerCount);
 
       if (!result.success) {
-        return NextResponse.json({ error: result.error }, { status: 400 });
+        return NextResponse.json({
+          error: result.error,
+          invalidWords: result.invalidWords,
+        }, { status: 400 });
       }
 
       // Save the move
@@ -96,13 +103,10 @@ export async function POST(
       if (result.gameOver) {
         updateData.status = 'completed';
         updateData.ended_at = new Date().toISOString();
-        // Determine result based on scores
         const scores = result.newBoardState!.scores;
         const maxScore = Math.max(...scores);
         const winnerSeat = scores.indexOf(maxScore);
-        // For Scrabble, result is always 'win' (someone wins by score)
         updateData.result = 'win';
-        // Store winner seat in current_turn for reference
         updateData.current_turn = winnerSeat;
       }
 
@@ -147,15 +151,12 @@ export async function POST(
         },
       } as Record<string, unknown>);
 
-      // Check if game should end from consecutive passes/exchanges
-      const gameOver = result.newBoardState!.consecutivePasses >= playerCount * 2;
-
       const updateData: Record<string, unknown> = {
         board_state: result.newBoardState,
         current_turn: result.nextTurn,
       };
 
-      if (gameOver) {
+      if (result.gameOver) {
         updateData.status = 'completed';
         updateData.ended_at = new Date().toISOString();
         updateData.result = 'win';
@@ -173,7 +174,7 @@ export async function POST(
 
       return NextResponse.json({
         success: true,
-        gameOver,
+        gameOver: result.gameOver,
       });
     }
 
@@ -211,6 +212,8 @@ export async function POST(
       return NextResponse.json({
         success: true,
         gameOver: result.gameOver,
+        scorelessTurns: result.newBoardState.consecutivePasses,
+        maxScorelessTurns: MAX_SCORELESS_TURNS,
       });
     }
 

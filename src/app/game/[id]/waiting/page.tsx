@@ -156,9 +156,9 @@ function WaitingRoomContent({ gameId }: { gameId: string }) {
             </CardTitle>
             <CardDescription>
               {game.game_type === 'scrabble'
-                ? `Waiting for players (need ${game.min_players ?? 2})`
-                : 'Waiting for Player 2'}
-              {' — '}Share the PIN or link to start
+                ? `Waiting for players (need ${game.max_players ?? 2} total)`
+                : 'Waiting for one more player'}
+              {' — '}share the PIN or link to start
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -187,7 +187,7 @@ function WaitingRoomContent({ gameId }: { gameId: string }) {
             {/* Waiting animation */}
             <div className="flex items-center justify-center gap-2 py-4">
               <Loader2 className={`h-5 w-5 animate-spin ${game.game_type === 'scrabble' ? 'text-amber-600' : 'text-green-600'}`} />
-              <span className="text-stone-600">Waiting for opponent to join...</span>
+              <span className="text-stone-600">Waiting for players to join...</span>
             </div>
 
             {/* Game settings summary */}
@@ -198,6 +198,18 @@ function WaitingRoomContent({ gameId }: { gameId: string }) {
                 <span className="font-medium capitalize">{game.game_type === 'scrabble' ? 'Scrabble' : 'Codenames Duet'}</span>
                 <span>Players:</span>
                 <span className="font-medium">{game.max_players ?? 2}</span>
+                {game.game_type === 'scrabble' && (
+                  <>
+                    <span>Dictionary:</span>
+                    <span className="font-medium capitalize">
+                      {(() => {
+                        const bs = game.board_state as unknown as Record<string, unknown>;
+                        const mode = bs?.dictionaryMode as string;
+                        return mode === 'strict' ? 'Strict' : mode === 'off' ? 'No rules' : 'Friendly';
+                      })()}
+                    </span>
+                  </>
+                )}
                 {game.game_type === 'codenames' && (
                   <>
                     <span>Timer Tokens:</span>
