@@ -1,7 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { ArrowLeftRight, SkipForward, RotateCcw, Search, Check } from 'lucide-react';
+import { ArrowLeftRight, SkipForward, RotateCcw, Search, Check, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 
 interface ScrabbleActionsProps {
   isMyTurn: boolean;
@@ -15,9 +15,13 @@ interface ScrabbleActionsProps {
   onRecall: () => void;
   onToggleMode: () => void;
   onCheckWord?: () => void;
+  onCheckFormedWord?: () => void;
   isSubmitting: boolean;
   tilesInBag: number;
   dictionaryMode: string;
+  formedWord?: string;
+  wordCheckResult?: 'valid' | 'invalid' | null;
+  isCheckingWord?: boolean;
 }
 
 export function ScrabbleActions({
@@ -32,9 +36,13 @@ export function ScrabbleActions({
   onRecall,
   onToggleMode,
   onCheckWord,
+  onCheckFormedWord,
   isSubmitting,
   tilesInBag,
   dictionaryMode,
+  formedWord = '',
+  wordCheckResult = null,
+  isCheckingWord = false,
 }: ScrabbleActionsProps) {
   // ── Not my turn ───────────────────────────────────────────────────────
   if (!isMyTurn) {
@@ -89,21 +97,45 @@ export function ScrabbleActions({
   }
 
   // ── Play mode ─────────────────────────────────────────────────────────
-  // Contextual hint based on state
-  let hint = '';
-  if (!hasPendingTiles && !hasSelectedRackTile) {
-    hint = 'Tap a tile, then tap the board';
-  } else if (hasSelectedRackTile && !hasPendingTiles) {
-    hint = 'Now tap a cell on the board';
-  } else if (hasPendingTiles) {
-    hint = 'Tap placed tiles to undo';
-  }
+
+  // Formed word display
+  const showFormedWord = hasPendingTiles && formedWord.length >= 2;
 
   return (
     <div className="px-3 py-1.5 space-y-1">
-      {/* Hint */}
-      {hint && (
-        <div className="text-[11px] text-stone-500 text-center">{hint}</div>
+      {/* Formed word + check */}
+      {showFormedWord && dictionaryMode !== 'off' && (
+        <div className="flex items-center justify-center gap-2">
+          <span className="text-xs font-semibold uppercase tracking-wider text-stone-300">
+            {formedWord}
+          </span>
+          {wordCheckResult === 'valid' ? (
+            <span className="flex items-center gap-0.5 text-emerald-400 text-[11px]">
+              <CheckCircle className="w-3 h-3" /> valid
+            </span>
+          ) : wordCheckResult === 'invalid' ? (
+            <span className="flex items-center gap-0.5 text-red-400 text-[11px]">
+              <XCircle className="w-3 h-3" /> not found
+            </span>
+          ) : isCheckingWord ? (
+            <Loader2 className="w-3 h-3 text-stone-500 animate-spin" />
+          ) : (
+            <button
+              onClick={onCheckFormedWord}
+              className="text-[11px] text-blue-400 hover:text-blue-300 transition-colors"
+            >
+              Check?
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Hint (only when no tiles placed yet) */}
+      {!hasPendingTiles && !hasSelectedRackTile && (
+        <div className="text-[11px] text-stone-500 text-center">Tap a tile, then tap the board</div>
+      )}
+      {hasSelectedRackTile && !hasPendingTiles && (
+        <div className="text-[11px] text-stone-500 text-center">Now tap a cell on the board</div>
       )}
 
       {/* Actions row */}

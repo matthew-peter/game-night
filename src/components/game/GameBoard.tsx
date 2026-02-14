@@ -80,17 +80,21 @@ const WordCard = memo(function WordCard({
           indicator: '☠ DEAD',
           indicatorColor: 'bg-red-900 text-white',
         };
-      } else {
-        const showGreenBorder = isStillMyAgent;
+      } else if (isStillMyAgent) {
+        // ── KEY STATE: revealed as bystander, but this is MY agent ──
+        // Must be visually unmissable — pulsing green glow + distinct green card
         return {
-          card: showGreenBorder
-            ? 'bg-amber-200 border-emerald-500 border-2'
-            : 'bg-amber-200 border-amber-400',
+          card: 'bg-emerald-100 border-emerald-500 border-2 ring-2 ring-emerald-400/60 animate-pulse-subtle',
+          text: 'text-emerald-900',
+          indicator: '★ YOUR AGENT',
+          indicatorColor: 'bg-emerald-600 text-white',
+        };
+      } else {
+        return {
+          card: 'bg-amber-200 border-amber-400',
           text: 'text-amber-900',
           indicator: guessedByMe ? '○ YOU' : '○ THEM',
-          indicatorColor: showGreenBorder
-            ? 'bg-emerald-600 text-white'
-            : 'bg-amber-300 text-amber-800',
+          indicatorColor: 'bg-amber-300 text-amber-800',
         };
       }
     }

@@ -12,7 +12,8 @@ export async function sendTurnNotification(
         gameId,
         userId,
         opponentName,
-        message
+        message,
+        title: 'Game Night',
       })
     });
     return response.ok;

@@ -6,7 +6,6 @@ import { cn } from '@/lib/utils';
 interface ScrabbleTileProps {
   letter: string;
   isBlank?: boolean;
-  /** board = placed on board, board-pending = just placed (removable), rack = in player's rack */
   variant?: 'board' | 'board-pending' | 'rack';
   isSelected?: boolean;
   isDragging?: boolean;
@@ -35,25 +34,30 @@ export function ScrabbleTile({
       onDragEnd={onDragEnd}
       onClick={onClick}
       className={cn(
-        'relative inline-flex items-center justify-center select-none font-bold uppercase',
+        'relative inline-flex items-center justify-center select-none uppercase',
 
         // ── Size ──
         isBoard
-          ? 'w-full h-full rounded-[1px] text-[9px] sm:text-[11px]'
-          : 'w-[42px] h-[42px] sm:w-11 sm:h-11 rounded text-[15px] sm:text-[17px]',
+          ? 'w-full h-full rounded-[1px]'
+          : 'w-[42px] h-[42px] sm:w-11 sm:h-11 rounded',
 
-        // ── Surface ──
+        // ── Font ──
+        isBoard
+          ? 'text-[10px] sm:text-xs font-extrabold'
+          : 'text-[16px] sm:text-[18px] font-bold',
+
+        // ── Surface — cream tiles stand out against beige board ──
         variant === 'board'
-          ? 'bg-amber-100 text-stone-800'
+          ? 'bg-[#F7ECCE] text-[#3B2F1E] border border-[#C9B88A] shadow-[inset_0_1px_0_#fff,0_1px_1px_rgba(0,0,0,0.15)]'
           : variant === 'board-pending'
-            ? 'bg-amber-200 text-stone-800 ring-1 ring-amber-400/80 shadow-sm shadow-amber-500/20'
-            : 'bg-amber-100 text-stone-800 shadow-md border border-amber-200/60',
+            ? 'bg-[#FFF8E1] text-[#3B2F1E] border-2 border-amber-500 shadow-[0_0_4px_rgba(245,180,50,0.4)]'
+            : 'bg-[#F7ECCE] text-[#3B2F1E] border border-[#C9B88A] shadow-md',
 
-        // Blank tiles
-        isBlank && 'text-stone-500',
+        // Blank
+        isBlank && 'text-stone-400',
 
-        // Selected (rack only)
-        isSelected && 'ring-2 ring-blue-400 scale-[1.08] shadow-lg shadow-blue-500/25 z-10',
+        // Selected (rack)
+        isSelected && 'ring-2 ring-blue-500 scale-[1.08] shadow-lg z-10',
 
         // Dragging
         isDragging && 'opacity-30 scale-90',
@@ -65,12 +69,12 @@ export function ScrabbleTile({
         'transition-all duration-75',
       )}
     >
-      <span className={cn('leading-none', isBlank && 'italic')}>{letter || ''}</span>
+      <span className="leading-none">{letter || ''}</span>
       {value > 0 && (
         <span className={cn(
-          'absolute font-medium leading-none text-stone-500',
+          'absolute font-bold leading-none text-[#8B7355]',
           isBoard
-            ? 'bottom-0 right-[1px] text-[3.5px] sm:text-[5px]'
+            ? 'bottom-0 right-[1px] text-[4px] sm:text-[5px]'
             : 'bottom-[2px] right-[3px] text-[7px]'
         )}>
           {value}

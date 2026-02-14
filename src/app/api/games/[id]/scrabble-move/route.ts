@@ -125,6 +125,7 @@ export async function POST(
         wordsFormed: result.wordsFormed,
         totalScore: result.totalScore,
         gameOver: result.gameOver,
+        nextTurn: result.nextTurn,
       });
     }
 
@@ -175,6 +176,7 @@ export async function POST(
       return NextResponse.json({
         success: true,
         gameOver: result.gameOver,
+        nextTurn: result.nextTurn,
       });
     }
 
@@ -212,6 +214,7 @@ export async function POST(
       return NextResponse.json({
         success: true,
         gameOver: result.gameOver,
+        nextTurn: result.nextTurn,
         scorelessTurns: result.newBoardState.consecutivePasses,
         maxScorelessTurns: MAX_SCORELESS_TURNS,
       });
