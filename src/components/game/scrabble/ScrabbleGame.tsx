@@ -466,11 +466,11 @@ export function ScrabbleGame({
         />
       </div>
 
-      {/* Small spacer */}
-      <div className="flex-1 max-h-3" />
+      {/* Spacer */}
+      <div className="flex-1 max-h-2" />
 
       {/* Rack + actions — bottom */}
-      <div className="shrink-0 pb-safe">
+      <div className="shrink-0" style={{ paddingBottom: 'calc(4px + env(safe-area-inset-bottom))' }}>
         <TileRack
           tiles={displayedRackTiles.map(t => t.letter)}
           selectedIndices={selectedRackIndices}

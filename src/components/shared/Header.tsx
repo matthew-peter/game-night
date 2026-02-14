@@ -17,7 +17,7 @@ export function Header() {
   const { user, signOut } = useAuth();
 
   return (
-    <header className="bg-stone-800 text-white">
+    <header className="bg-stone-800 text-white" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <div className="max-w-4xl mx-auto px-3 py-1.5 flex items-center justify-between">
         <Link href="/dashboard" className="flex items-center gap-1.5">
           <span className="text-sm font-bold">GAME NIGHT</span>

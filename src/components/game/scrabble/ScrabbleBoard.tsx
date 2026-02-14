@@ -16,12 +16,12 @@ interface ScrabbleBoardProps {
   isMyTurn?: boolean;
 }
 
-// Vivid, classic Scrabble colors
+// Rounded, vivid premium squares
 const PREMIUM: Record<NonNullable<PremiumType>, { cell: string; label: string; text: string }> = {
-  TW: { cell: 'bg-[#D4453A]', label: '3×W', text: 'text-white/90' },
-  DW: { cell: 'bg-[#F0A0B8]', label: '2×W', text: 'text-[#7D1F3E]' },
-  TL: { cell: 'bg-[#3486C0]', label: '3×L', text: 'text-white/90' },
-  DL: { cell: 'bg-[#8DC8E8]', label: '2×L', text: 'text-[#184060]' },
+  TW: { cell: 'bg-[#D4453A]', label: '3W', text: 'text-white/90 font-extrabold' },
+  DW: { cell: 'bg-[#EFA0B8]', label: '2W', text: 'text-[#7D1F3E] font-extrabold' },
+  TL: { cell: 'bg-[#3486C0]', label: '3L', text: 'text-white/90 font-extrabold' },
+  DL: { cell: 'bg-[#8DC8E8]', label: '2L', text: 'text-[#154360] font-extrabold' },
 };
 
 export function ScrabbleBoard({
@@ -31,7 +31,6 @@ export function ScrabbleBoard({
   onRemovePending,
   disabled = false,
   hasSelectedTile = false,
-  isMyTurn = false,
 }: ScrabbleBoardProps) {
   const pendingSet = useMemo(
     () => new Set(pendingPlacements.map(p => `${p.row},${p.col}`)),
@@ -66,10 +65,10 @@ export function ScrabbleBoard({
   }, [cells, pendingSet, onCellDrop, onRemovePending, disabled]);
 
   return (
-    <div className="w-full max-w-[min(100vw-8px,460px)] mx-auto">
-      {/* Board frame — warm wooden brown border */}
+    <div className="w-full max-w-[min(100vw-16px,460px)] mx-auto">
+      {/* Board — rounded corners, shadow for depth */}
       <div
-        className="grid gap-[1.5px] p-[2.5px] rounded bg-[#8B7355]"
+        className="grid gap-[1.5px] p-[3px] rounded-xl bg-[#8B7355] shadow-[0_4px_20px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.1)]"
         style={{ gridTemplateColumns: `repeat(${BOARD_SIZE}, 1fr)` }}
       >
         {Array.from({ length: BOARD_SIZE }).map((_, row) =>
@@ -81,17 +80,25 @@ export function ScrabbleBoard({
             const isEmpty = !cell && !pending;
             const canPlace = isEmpty && !disabled && hasSelectedTile;
 
+            // Corner rounding for the outermost cells
+            const isTopLeft = row === 0 && col === 0;
+            const isTopRight = row === 0 && col === BOARD_SIZE - 1;
+            const isBottomLeft = row === BOARD_SIZE - 1 && col === 0;
+            const isBottomRight = row === BOARD_SIZE - 1 && col === BOARD_SIZE - 1;
+            const cornerClass = isTopLeft ? 'rounded-tl-lg' : isTopRight ? 'rounded-tr-lg' : isBottomLeft ? 'rounded-bl-lg' : isBottomRight ? 'rounded-br-lg' : '';
+
             return (
               <div
                 key={`${row}-${col}`}
                 className={cn(
                   'aspect-square flex items-center justify-center',
+                  cornerClass,
                   // Base: warm sandy beige
                   'bg-[#DDD0B2]',
-                  // Premium square colors — vivid
+                  // Premium square colors
                   isEmpty && premium && PREMIUM[premium].cell,
                   // Center star
-                  isEmpty && isCenter && !premium && 'bg-[#F0A0B8]',
+                  isEmpty && isCenter && !premium && 'bg-[#EFA0B8]',
                   // Hover when a tile is selected
                   canPlace && 'cursor-pointer hover:brightness-[0.92] transition-colors',
                 )}
@@ -112,7 +119,7 @@ export function ScrabbleBoard({
                   <>
                     {premium && (
                       <span className={cn(
-                        'text-[8px] sm:text-[10px] font-extrabold leading-none select-none',
+                        'text-[8px] sm:text-[10px] leading-none select-none',
                         PREMIUM[premium].text,
                       )}>
                         {PREMIUM[premium].label}
