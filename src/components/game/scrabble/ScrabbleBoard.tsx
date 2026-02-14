@@ -67,14 +67,9 @@ export function ScrabbleBoard({
 
   return (
     <div className="w-full max-w-[min(100vw-8px,460px)] mx-auto">
-      {/* Board frame — golden when your turn, muted when waiting */}
+      {/* Board frame — warm wooden brown border */}
       <div
-        className={cn(
-          'grid gap-[1.5px] p-[2.5px] rounded transition-colors duration-300',
-          isMyTurn
-            ? 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.35)]'
-            : 'bg-[#9E8B6E]',
-        )}
+        className="grid gap-[1.5px] p-[2.5px] rounded bg-[#8B7355]"
         style={{ gridTemplateColumns: `repeat(${BOARD_SIZE}, 1fr)` }}
       >
         {Array.from({ length: BOARD_SIZE }).map((_, row) =>

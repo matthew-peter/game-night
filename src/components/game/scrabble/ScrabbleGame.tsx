@@ -347,7 +347,7 @@ export function ScrabbleGame({
     const maxScore = Math.max(...boardState.scores);
 
     return (
-      <div className="fixed inset-0 bg-[#3E2F20] flex flex-col overflow-hidden">
+      <div className="fixed inset-0 bg-stone-800 flex flex-col overflow-hidden">
         <Header />
 
         <div className="flex-1 overflow-y-auto px-3 py-4">
@@ -428,20 +428,22 @@ export function ScrabbleGame({
   const hasSelectedRackTile = mode === 'play' && selectedRackIndices.size === 1;
 
   return (
-    <div className="fixed inset-0 bg-[#3E2F20] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 bg-[#F5F0E8] flex flex-col overflow-hidden">
       <Header />
 
-      {/* Scoreboard + emoji + chat — single row */}
-      <div className="shrink-0 flex items-center gap-1 pr-2">
-        <div className="flex-1 min-w-0">
-          <ScrabbleScoreboard
-            boardState={boardState}
-            players={players}
-            currentTurn={game.current_turn}
-            mySeat={mySeat}
-            userId={user.id}
-          />
-        </div>
+      {/* Scoreboard — full-width colored banner */}
+      <div className="shrink-0">
+        <ScrabbleScoreboard
+          boardState={boardState}
+          players={players}
+          currentTurn={game.current_turn}
+          mySeat={mySeat}
+          userId={user.id}
+        />
+      </div>
+
+      {/* Emoji + chat strip */}
+      <div className="shrink-0 flex items-center justify-end gap-1 px-2 py-1">
         <Reactions gameId={game.id} playerId={user.id} compact />
         <GameChat
           gameId={game.id}
@@ -451,7 +453,7 @@ export function ScrabbleGame({
         />
       </div>
 
-      {/* Board — tight below scoreboard */}
+      {/* Board */}
       <div className="shrink-0 px-1">
         <ScrabbleBoard
           cells={boardState.cells}
@@ -464,10 +466,10 @@ export function ScrabbleGame({
         />
       </div>
 
-      {/* Small flex spacer — just enough to keep rack near the board */}
-      <div className="flex-1 max-h-4" />
+      {/* Small spacer */}
+      <div className="flex-1 max-h-3" />
 
-      {/* Rack + actions — anchored to bottom */}
+      {/* Rack + actions — bottom */}
       <div className="shrink-0 pb-safe">
         <TileRack
           tiles={displayedRackTiles.map(t => t.letter)}

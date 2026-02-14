@@ -1,45 +1,28 @@
 // Service Worker for Web Push Notifications
 //
-// Notification routing logic:
-// 1. User is on the SAME game page → suppress entirely (real-time handles it)
-// 2. User has the app open (any page visible) → forward to app for in-app toast
-// 3. User is away (no visible windows) → show OS push notification
+// Notification routing:
+// 1. User is on the SAME game page → suppress (real-time handles it)
+// 2. App is open but on a different page → show OS notification (user isn't watching that game)
+// 3. App is not open → show OS notification
 
 self.addEventListener('push', function(event) {
   if (!event.data) return;
 
-  const data = event.data.json();
-  const gameId = data.gameId;
+  var data = event.data.json();
+  var gameId = data.gameId;
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
-      var visibleClient = null;
-      var onGamePage = false;
-
+      // Check if user is viewing the exact game page
       for (var i = 0; i < clientList.length; i++) {
         var client = clientList[i];
-        if (client.visibilityState === 'visible') {
-          visibleClient = client;
-          if (gameId && client.url.includes('/game/' + gameId)) {
-            onGamePage = true;
-          }
+        if (client.visibilityState === 'visible' && gameId && client.url.includes('/game/' + gameId)) {
+          // User is looking at this game — real-time subscription handles updates
+          return;
         }
       }
 
-      // Case 1: User is viewing this exact game — suppress entirely.
-      // The real-time subscription already updated the UI.
-      if (onGamePage) {
-        return;
-      }
-
-      // Case 2: User has the app open on ANY page — suppress entirely.
-      // Realtime subscriptions handle all in-app updates. Push notifications
-      // are only useful when the app is fully closed/backgrounded.
-      if (visibleClient) {
-        return;
-      }
-
-      // Case 3: App is not visible — show full OS notification.
+      // Show OS notification (user is either on a different page, or app is closed)
       var options = {
         body: data.body || "It's your turn!",
         icon: '/icon-192.png',
@@ -73,7 +56,6 @@ self.addEventListener('notificationclick', function(event) {
         var client = clientList[i];
         if ('focus' in client) {
           client.focus();
-          // Navigate to the game if not already there
           if (!client.url.includes(url)) {
             client.navigate(url);
           }

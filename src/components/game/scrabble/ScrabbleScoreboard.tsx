@@ -20,6 +20,7 @@ export function ScrabbleScoreboard({
   userId,
 }: ScrabbleScoreboardProps) {
   const tilesInBag = boardState.tileBag.length;
+  const isMyTurn = currentTurn === mySeat;
   const lp = boardState.lastPlay;
 
   // Last play summary
@@ -36,32 +37,51 @@ export function ScrabbleScoreboard({
   const nearEnd = boardState.consecutivePasses >= MAX_SCORELESS_TURNS - 2 && boardState.consecutivePasses > 0;
 
   return (
-    <div className="px-3 py-1.5">
+    <div className={cn(
+      'px-3 py-2 transition-colors duration-300',
+      isMyTurn ? 'bg-amber-500' : 'bg-[#8B1A1A]',
+    )}>
+      {/* Turn banner */}
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-white/80">
+          {isMyTurn ? '▶ Your Turn' : 'Waiting...'}
+        </span>
+        <span className="text-[11px] text-white/60 tabular-nums">{tilesInBag} in bag</span>
+      </div>
+
       {/* Scores */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-4">
         {players.map((player) => {
           const isMe = player.user_id === userId;
           const active = player.seat === currentTurn;
           const score = boardState.scores[player.seat] ?? 0;
           const name = isMe ? 'You' : player.user?.username ?? `P${player.seat + 1}`;
           return (
-            <div key={player.id} className="flex items-center gap-1.5 text-sm">
-              {active && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />}
-              <span className={cn('font-medium', isMe ? 'text-stone-200' : 'text-stone-400')}>{name}</span>
-              <span className="font-bold text-amber-400 tabular-nums">{score}</span>
+            <div key={player.id} className="flex items-center gap-1.5">
+              <span className={cn(
+                'text-sm font-semibold',
+                active ? 'text-white' : 'text-white/60',
+              )}>
+                {name}
+              </span>
+              <span className={cn(
+                'text-lg font-bold tabular-nums',
+                active ? 'text-white' : 'text-white/70',
+              )}>
+                {score}
+              </span>
             </div>
           );
         })}
-        <span className="ml-auto text-[11px] text-stone-600 tabular-nums">{tilesInBag} in bag</span>
       </div>
 
-      {/* Last play */}
+      {/* Last play / warning */}
       {(lastPlayText || nearEnd) && (
         <div className="flex items-center justify-between text-[11px] mt-0.5">
-          {lastPlayText && <span className="text-stone-500 truncate">{lastPlayText}</span>}
+          {lastPlayText && <span className="text-white/50 truncate">{lastPlayText}</span>}
           {nearEnd && (
-            <span className="text-amber-500/70 shrink-0 ml-auto">
-              {MAX_SCORELESS_TURNS - boardState.consecutivePasses} turns left
+            <span className="text-white/80 font-medium shrink-0 ml-auto">
+              ⚠ {MAX_SCORELESS_TURNS - boardState.consecutivePasses} scoreless turns left
             </span>
           )}
         </div>

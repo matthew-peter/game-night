@@ -254,7 +254,7 @@ export function GameChat({
             gameId,
             userId: recipient.userId,
             message: `${playerName}: ${msgText}`,
-            title: 'New Message',
+            title: 'Game Night',
           }),
         });
       } catch {

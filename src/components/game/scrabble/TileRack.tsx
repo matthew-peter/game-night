@@ -47,7 +47,7 @@ export function TileRack({
         />
       ))}
       {Array.from({ length: Math.max(0, RACK_SIZE - tiles.length) }).map((_, i) => (
-        <div key={`e-${i}`} className="w-[44px] h-[44px] sm:w-12 sm:h-12 rounded border border-dashed border-[#6B5B4A]/40" />
+        <div key={`e-${i}`} className="w-[44px] h-[44px] sm:w-12 sm:h-12 rounded border border-dashed border-stone-300" />
       ))}
     </div>
   );
