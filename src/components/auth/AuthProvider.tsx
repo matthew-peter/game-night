@@ -29,20 +29,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const init = async () => {
       try {
-        const { data } = await supabase.auth.getSession();
+        const { data, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) {
+          console.error('[Auth] getSession error:', sessionError.message);
+        }
         if (data.session?.user) {
-          const { data: profile } = await supabase
+          const { data: profile, error: profileError } = await supabase
             .from('users')
             .select('*')
             .eq('id', data.session.user.id)
             .single();
+          if (profileError) {
+            console.error('[Auth] profile fetch error:', profileError.message, profileError.code);
+          }
           if (profile) {
             setUser(profile);
             setStoreUser(profile);
+          } else {
+            // Fallback: use auth user data so we don't lose the session
+            console.warn('[Auth] No profile found, using auth user data as fallback');
+            const fallback = {
+              id: data.session.user.id,
+              username: data.session.user.user_metadata?.username || data.session.user.email?.split('@')[0] || 'Player',
+              created_at: data.session.user.created_at,
+            };
+            setUser(fallback);
+            setStoreUser(fallback);
           }
         }
-      } catch {
-        // Ignore errors
+      } catch (err) {
+        console.error('[Auth] init error:', err);
       }
       setLoading(false);
     };
@@ -85,18 +101,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
-    if (error) return { error: error.message };
+    if (error) {
+      console.error('[Auth] signIn error:', error.message);
+      return { error: error.message };
+    }
 
     if (data.user) {
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('users')
         .select('*')
         .eq('id', data.user.id)
         .single();
 
+      if (profileError) {
+        console.error('[Auth] signIn profile error:', profileError.message, profileError.code);
+      }
+
       if (profile) {
         setUser(profile);
         setStoreUser(profile);
+      } else {
+        // Fallback: use auth user data
+        const fallback = {
+          id: data.user.id,
+          username: data.user.user_metadata?.username || email.split('@')[0] || 'Player',
+          created_at: data.user.created_at,
+        };
+        setUser(fallback);
+        setStoreUser(fallback);
       }
     }
 
