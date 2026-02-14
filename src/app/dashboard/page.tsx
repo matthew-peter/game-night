@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { AuthProvider, useAuth } from '@/components/auth/AuthProvider';
 import { Header } from '@/components/shared/Header';
@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
 import { createClient } from '@/lib/supabase/client';
 import { getRandomWords } from '@/lib/game/words';
 import { generateKeyCard } from '@/lib/game/keyGenerator';
@@ -24,7 +25,8 @@ import Link from 'next/link';
 function DashboardContent() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const supabase = createClient();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const supabase = useMemo(() => createClient(), []);
   
   const [joinPin, setJoinPin] = useState('');
   const [joiningGame, setJoiningGame] = useState(false);
@@ -36,6 +38,8 @@ function DashboardContent() {
   const [timerTokens, setTimerTokens] = useState(9);
   const [clueStrictness, setClueStrictness] = useState<ClueStrictness>('basic');
   const [firstClueGiver, setFirstClueGiver] = useState<'creator' | 'joiner' | 'random'>('random');
+  const [allowWordSwaps, setAllowWordSwaps] = useState(true);
+  const [maxWordSwaps, setMaxWordSwaps] = useState(3);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   // Fetch active games and subscribe to changes
@@ -188,6 +192,20 @@ function DashboardContent() {
         ? (Math.random() < 0.5 ? 'creator' : 'joiner')
         : firstClueGiver;
       
+      const boardState: Record<string, unknown> = { revealed: {} };
+
+      // If word swaps are enabled, include setup phase in board_state
+      if (allowWordSwaps) {
+        boardState.setup = {
+          enabled: true,
+          maxSwaps: maxWordSwaps,
+          player1SwapsUsed: 0,
+          player2SwapsUsed: 0,
+          player1Ready: false,
+          player2Ready: false,
+        };
+      }
+
       const newGame = {
         id: crypto.randomUUID(),
         pin,
@@ -196,7 +214,7 @@ function DashboardContent() {
         player2_id: null,
         key_card: keyCard,
         words,
-        board_state: { revealed: {} },
+        board_state: boardState,
         timer_tokens: timerTokens,
         clue_strictness: clueStrictness,
         current_turn: resolvedFirstClue === 'creator' ? 'player1' : 'player2',
@@ -476,6 +494,37 @@ function DashboardContent() {
                         </SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                  {/* Word swaps - for playing with kids or unfamiliar words */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label>Word Swaps</Label>
+                        <p className="text-xs text-stone-500 mt-0.5">
+                          Let players swap out words they don&apos;t know before the game starts
+                        </p>
+                      </div>
+                      <Switch
+                        checked={allowWordSwaps}
+                        onCheckedChange={setAllowWordSwaps}
+                      />
+                    </div>
+                    {allowWordSwaps && (
+                      <div className="space-y-2 pl-1">
+                        <Label className="text-sm">Max swaps per player: {maxWordSwaps}</Label>
+                        <Slider
+                          value={[maxWordSwaps]}
+                          onValueChange={(v) => setMaxWordSwaps(v[0])}
+                          min={1}
+                          max={5}
+                          step={1}
+                          className="w-full"
+                        />
+                        <p className="text-xs text-stone-500">
+                          Each player can independently swap up to {maxWordSwaps} word{maxWordSwaps !== 1 ? 's' : ''} before playing.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
                 

@@ -10,6 +10,7 @@ import { ClueInput } from '@/components/game/ClueInput';
 import { GameActions } from '@/components/game/GameActions';
 import { GameReview } from '@/components/game/GameReview';
 import { InlineHistory } from '@/components/game/InlineHistory';
+import { SetupPhase } from '@/components/game/SetupPhase';
 import { useGameStore } from '@/lib/store/gameStore';
 import { createClient } from '@/lib/supabase/client';
 import { Game, Move, CurrentTurn } from '@/lib/supabase/types';
@@ -40,7 +41,19 @@ function GamePageContent({ gameId }: { gameId: string }) {
   const [loading, setLoading] = useState(true);
   const [playerRole, setPlayerRole] = useState<CurrentTurn | null>(null);
   const [completionSynced, setCompletionSynced] = useState(false);
+  const [assassinAnimating, setAssassinAnimating] = useState(false);
   const isSubmittingGuess = useRef(false);
+
+  // ── Lock body scroll for iOS PWA ───────────────────────────────────────
+  // Prevents the pull-to-bounce / overscroll on iPhone home-screen apps.
+  // The game container itself is a fixed viewport; only internal scroll
+  // areas (history, board overflow) should scroll.
+  useEffect(() => {
+    document.body.classList.add('game-page-active');
+    return () => {
+      document.body.classList.remove('game-page-active');
+    };
+  }, []);
 
   // ── Sync helpers ──────────────────────────────────────────────────────
   // Refetch game + moves from DB.  Used on visibility change, reconnect,
@@ -295,6 +308,14 @@ function GamePageContent({ gameId }: { gameId: string }) {
       const optimisticUpdates: Partial<Game> = {
         board_state: result.newBoardState,
       };
+
+      // If assassin hit, let the animation play out before showing game-over
+      if (result.cardType === 'assassin') {
+        setAssassinAnimating(true);
+        // The assassin animation is ~1.6s. Give players 2.5s total to see it.
+        setTimeout(() => setAssassinAnimating(false), 2500);
+      }
+
       if (result.gameOver) {
         optimisticUpdates.status = 'completed';
         optimisticUpdates.result = result.won ? 'win' : 'loss';
@@ -389,6 +410,31 @@ function GamePageContent({ gameId }: { gameId: string }) {
   // The API's resolveCluePhase() detects when a clue-giver has no agents
   // left and auto-switches turns atomically, preventing race conditions.
 
+  // ── Assassin animation delay for observer (non-guesser) ──────────────
+  // When the game transitions to 'completed' with an assassin hit via a
+  // realtime update (i.e. the OTHER player made the guess), the local
+  // player hasn't set assassinAnimating. Detect this and add a delay so
+  // both players see the dramatic reveal before the game-over screen.
+  const prevGameStatus = useRef(game?.status);
+  useEffect(() => {
+    if (
+      prevGameStatus.current !== 'completed' &&
+      game?.status === 'completed' &&
+      game?.result === 'loss' &&
+      !assassinAnimating
+    ) {
+      // Check if an assassin was actually revealed
+      const hasAssassin = Object.values(game.board_state.revealed).some(
+        (r) => r.type === 'assassin'
+      );
+      if (hasAssassin) {
+        setAssassinAnimating(true);
+        setTimeout(() => setAssassinAnimating(false), 2500);
+      }
+    }
+    prevGameStatus.current = game?.status;
+  }, [game?.status, game?.result, game?.board_state.revealed, assassinAnimating]);
+
   // ── Final sync when game completes ────────────────────────────────────
   // When the game transitions to 'completed', do one final authoritative
   // sync so that GameReview always shows the correct agent counts and
@@ -407,7 +453,7 @@ function GamePageContent({ gameId }: { gameId: string }) {
 
   if (authLoading || loading) {
     return (
-      <div className="h-dvh flex items-center justify-center">
+      <div className="fixed inset-0 flex items-center justify-center bg-stone-900">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
       </div>
     );
@@ -422,11 +468,28 @@ function GamePageContent({ gameId }: { gameId: string }) {
     return null;
   }
 
-  // Show review if game is completed (wait for final sync so counts are correct)
-  if (game.status === 'completed') {
+  // ── Setup phase: word swaps before gameplay ────────────────────────────
+  const inSetupPhase =
+    game.status === 'playing' &&
+    game.board_state.setup?.enabled &&
+    !(game.board_state.setup.player1Ready && game.board_state.setup.player2Ready);
+
+  if (inSetupPhase) {
+    return (
+      <SetupPhase
+        game={game}
+        playerRole={playerRole}
+        opponentName={opponent?.username}
+        onGameUpdated={syncFromServer}
+      />
+    );
+  }
+
+  // Show review if game is completed (wait for final sync AND any assassin animation)
+  if (game.status === 'completed' && !assassinAnimating) {
     if (!completionSynced) {
       return (
-        <div className="h-dvh flex items-center justify-center bg-stone-900">
+        <div className="fixed inset-0 flex items-center justify-center bg-stone-900">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
         </div>
       );
@@ -467,20 +530,21 @@ function GamePageContent({ gameId }: { gameId: string }) {
     : moves.filter(m => m.move_type === 'guess').length;
 
   return (
-    <div className="h-dvh bg-gradient-to-b from-stone-800 via-stone-700 to-stone-900 flex flex-col">
+    <div className="game-viewport fixed inset-0 bg-gradient-to-b from-stone-800 via-stone-700 to-stone-900 flex flex-col overflow-hidden">
       <Header />
       
       <GameStatus
         game={game}
         playerRole={playerRole}
         opponentName={opponent?.username}
+        opponentId={opponent?.id}
         currentClue={currentClue}
         guessCount={guessCount}
         userId={user?.id}
         userName={user?.username}
       />
       
-      <main className="flex-1 overflow-auto py-2 px-1 flex flex-col">
+      <main className="flex-1 min-h-0 overflow-y-auto game-scroll-area py-2 px-1 flex flex-col">
         <GameBoard
           game={game}
           playerRole={playerRole}
@@ -501,7 +565,7 @@ function GamePageContent({ gameId }: { gameId: string }) {
         )}
         
         {/* Inline move history - uses remaining space */}
-        <div className="flex-1 mt-2 bg-stone-800/50 rounded-lg mx-1 min-h-[100px] max-h-[180px] overflow-y-auto">
+        <div className="flex-1 mt-2 bg-stone-800/50 rounded-lg mx-1 min-h-[100px] max-h-[180px] overflow-y-auto game-scroll-area">
           <InlineHistory
             moves={moves}
             playerRole={playerRole}

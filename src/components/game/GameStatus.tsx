@@ -12,13 +12,14 @@ interface GameStatusProps {
   game: Game;
   playerRole: CurrentTurn;
   opponentName?: string;
+  opponentId?: string;
   currentClue?: Move | null;
   guessCount?: number;
   userId?: string;
   userName?: string;
 }
 
-export function GameStatus({ game, playerRole, opponentName, currentClue, guessCount = 0, userId, userName }: GameStatusProps) {
+export function GameStatus({ game, playerRole, opponentName, opponentId, currentClue, guessCount = 0, userId, userName }: GameStatusProps) {
   const isClueGiver = game.current_turn === playerRole;
   const isCluePhase = game.current_phase === 'clue';
   const isGuessPhase = game.current_phase === 'guess';
@@ -106,6 +107,7 @@ export function GameStatus({ game, playerRole, opponentName, currentClue, guessC
                   gameId={game.id}
                   playerId={userId}
                   playerName={userName || 'You'}
+                  opponentId={opponentId}
                   opponentName={opponentName}
                 />
               </div>
@@ -117,7 +119,7 @@ export function GameStatus({ game, playerRole, opponentName, currentClue, guessC
         {currentClue ? (
           <div className="flex items-center justify-center gap-2 py-1 bg-stone-800 rounded">
             <span className="text-stone-400 text-xs">CLUE:</span>
-            <TappableClueWord word={currentClue.clue_word || ''} className="text-white font-black text-lg" />
+            <TappableClueWord word={(currentClue.clue_word || '').toUpperCase()} className="text-white font-black text-lg" />
             <span className="text-amber-400 font-bold">{currentClue.clue_number}</span>
             {guessCount > 0 && (
               <span className="text-stone-400 text-xs">• {guessCount} guessed</span>

@@ -330,6 +330,7 @@ export function GameBoard({ game, playerRole, onGuess, hasActiveClue = false }: 
   const { selectedWordsForClue, toggleWordForClue } = useGameStore();
   const [highlightedWordIndex, setHighlightedWordIndex] = useState<number | null>(null);
   const [flippingWords, setFlippingWords] = useState<Record<string, CardType>>({});
+  const [boardShaking, setBoardShaking] = useState(false);
   const prevRevealedRef = useRef<Record<string, { type: CardType }>>(game.board_state.revealed);
   
   // Detect newly revealed cards and trigger flip animation
@@ -346,10 +347,19 @@ export function GameBoard({ game, playerRole, onGuess, hasActiveClue = false }: 
     
     if (Object.keys(newlyRevealed).length > 0) {
       setFlippingWords(newlyRevealed);
-      // Clear animation class after animation completes
+
+      // If an assassin was just revealed, shake the board
+      const hasAssassin = Object.values(newlyRevealed).includes('assassin');
+      if (hasAssassin) {
+        setBoardShaking(true);
+      }
+
+      // Clear animation classes after the longest animation completes
+      // (assassin flip is 1.1s + glow is 1.4s)
       const timeout = setTimeout(() => {
         setFlippingWords({});
-      }, 900);
+        setBoardShaking(false);
+      }, 1600);
       return () => clearTimeout(timeout);
     }
     
@@ -388,7 +398,7 @@ export function GameBoard({ game, playerRole, onGuess, hasActiveClue = false }: 
   
   return (
     <div className="w-full max-w-md mx-auto px-1">
-      <div className="grid grid-cols-5 gap-1">
+      <div className={cn("grid grid-cols-5 gap-1", boardShaking && "animate-board-shake")}>
         {game.words.map((word, index) => (
           <WordCard
             key={`${word}-${index}`}

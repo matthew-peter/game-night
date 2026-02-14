@@ -29,8 +29,19 @@ export interface RevealedCard {
   guessedBy: UserRole;
 }
 
+/** Pre-game setup state for word swaps */
+export interface SetupState {
+  enabled: boolean;
+  maxSwaps: number;
+  player1SwapsUsed: number;
+  player2SwapsUsed: number;
+  player1Ready: boolean;
+  player2Ready: boolean;
+}
+
 export interface BoardState {
   revealed: Record<string, RevealedCard>; // word -> revealed info
+  setup?: SetupState; // present during pre-game setup phase
 }
 
 export interface Game {

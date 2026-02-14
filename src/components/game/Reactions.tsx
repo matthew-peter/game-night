@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 
@@ -21,7 +21,7 @@ export function Reactions({ gameId, playerId, compact = false }: ReactionsProps)
   const [isOpen, setIsOpen] = useState(false);
   const [incomingReactions, setIncomingReactions] = useState<IncomingReaction[]>([]);
   const [sendingEmoji, setSendingEmoji] = useState<string | null>(null);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   // Subscribe to reactions

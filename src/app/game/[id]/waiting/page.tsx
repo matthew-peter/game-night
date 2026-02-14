@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
+import { useEffect, useState, use, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { AuthProvider, useAuth } from '@/components/auth/AuthProvider';
 import { Header } from '@/components/shared/Header';
@@ -14,7 +14,8 @@ import { Copy, Share2, Loader2, Check } from 'lucide-react';
 function WaitingRoomContent({ gameId }: { gameId: string }) {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const supabase = createClient();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const supabase = useMemo(() => createClient(), []);
   
   const [game, setGame] = useState<Game | null>(null);
   const [loading, setLoading] = useState(true);
@@ -192,6 +193,12 @@ function WaitingRoomContent({ gameId }: { gameId: string }) {
                 <span className="font-medium">{game.timer_tokens}</span>
                 <span>Clue Rules:</span>
                 <span className="font-medium capitalize">{game.clue_strictness.replace('_', ' ')}</span>
+                <span>Word Swaps:</span>
+                <span className="font-medium">
+                  {game.board_state.setup?.enabled
+                    ? `${game.board_state.setup.maxSwaps} per player`
+                    : 'Off'}
+                </span>
               </div>
             </div>
 
