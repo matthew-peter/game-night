@@ -16,12 +16,12 @@ interface ScrabbleBoardProps {
   isMyTurn?: boolean;
 }
 
-// Classic board-game palette — beige surface, colored premium squares
+// Vivid, classic Scrabble colors
 const PREMIUM: Record<NonNullable<PremiumType>, { cell: string; label: string; text: string }> = {
-  TW: { cell: 'bg-[#C0392B]', label: '3W', text: 'text-white' },
-  DW: { cell: 'bg-[#E8A0B4]', label: '2W', text: 'text-[#6D1F3A]' },
-  TL: { cell: 'bg-[#2471A3]', label: '3L', text: 'text-white' },
-  DL: { cell: 'bg-[#85C1E9]', label: '2L', text: 'text-[#154360]' },
+  TW: { cell: 'bg-[#D4453A]', label: '3×W', text: 'text-white/90' },
+  DW: { cell: 'bg-[#F0A0B8]', label: '2×W', text: 'text-[#7D1F3E]' },
+  TL: { cell: 'bg-[#3486C0]', label: '3×L', text: 'text-white/90' },
+  DL: { cell: 'bg-[#8DC8E8]', label: '2×L', text: 'text-[#184060]' },
 };
 
 export function ScrabbleBoard({
@@ -67,13 +67,13 @@ export function ScrabbleBoard({
 
   return (
     <div className="w-full max-w-[min(100vw-8px,460px)] mx-auto">
-      {/* Board frame — golden when your turn, muted brown when waiting */}
+      {/* Board frame — golden when your turn, muted when waiting */}
       <div
         className={cn(
-          'grid gap-[1.5px] p-[2px] rounded-sm transition-colors duration-300',
+          'grid gap-[1.5px] p-[2.5px] rounded transition-colors duration-300',
           isMyTurn
-            ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.3)]'
-            : 'bg-[#8B7355]',
+            ? 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.35)]'
+            : 'bg-[#9E8B6E]',
         )}
         style={{ gridTemplateColumns: `repeat(${BOARD_SIZE}, 1fr)` }}
       >
@@ -91,14 +91,14 @@ export function ScrabbleBoard({
                 key={`${row}-${col}`}
                 className={cn(
                   'aspect-square flex items-center justify-center',
-                  // Base: warm beige like a real board
-                  'bg-[#D4C5A0]',
-                  // Premium square colors
+                  // Base: warm sandy beige
+                  'bg-[#DDD0B2]',
+                  // Premium square colors — vivid
                   isEmpty && premium && PREMIUM[premium].cell,
                   // Center star
-                  isEmpty && isCenter && !premium && 'bg-[#E8A0B4]',
+                  isEmpty && isCenter && !premium && 'bg-[#F0A0B8]',
                   // Hover when a tile is selected
-                  canPlace && 'cursor-pointer hover:brightness-95 transition-colors',
+                  canPlace && 'cursor-pointer hover:brightness-[0.92] transition-colors',
                 )}
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(row, col, e)}
@@ -117,14 +117,14 @@ export function ScrabbleBoard({
                   <>
                     {premium && (
                       <span className={cn(
-                        'text-[6px] sm:text-[8px] font-extrabold leading-none select-none',
+                        'text-[8px] sm:text-[10px] font-extrabold leading-none select-none',
                         PREMIUM[premium].text,
                       )}>
                         {PREMIUM[premium].label}
                       </span>
                     )}
                     {isCenter && !premium && (
-                      <span className="text-[10px] sm:text-xs text-[#6D1F3A] font-bold select-none">★</span>
+                      <span className="text-[11px] sm:text-sm text-[#7D1F3E] font-bold select-none">★</span>
                     )}
                   </>
                 )}

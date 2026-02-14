@@ -11,6 +11,7 @@ import { Header } from '@/components/shared/Header';
 import { GameChat } from '@/components/game/GameChat';
 import { Game, Seat, GamePlayer, getOtherPlayers } from '@/lib/supabase/types';
 import { ScrabbleBoardState, TilePlacement, PlacedTile, DictionaryMode } from '@/lib/game/scrabble/types';
+import { Reactions } from '@/components/game/Reactions';
 import { sendTurnNotification } from '@/lib/notifications';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -346,7 +347,7 @@ export function ScrabbleGame({
     const maxScore = Math.max(...boardState.scores);
 
     return (
-      <div className="fixed inset-0 bg-stone-900 flex flex-col overflow-hidden">
+      <div className="fixed inset-0 bg-[#3E2F20] flex flex-col overflow-hidden">
         <Header />
 
         <div className="flex-1 overflow-y-auto px-3 py-4">
@@ -427,11 +428,11 @@ export function ScrabbleGame({
   const hasSelectedRackTile = mode === 'play' && selectedRackIndices.size === 1;
 
   return (
-    <div className="fixed inset-0 bg-stone-900 flex flex-col overflow-hidden">
+    <div className="fixed inset-0 bg-[#3E2F20] flex flex-col overflow-hidden">
       <Header />
 
-      {/* Scoreboard + chat — single row */}
-      <div className="shrink-0 flex items-center pr-2">
+      {/* Scoreboard + emoji + chat — single row */}
+      <div className="shrink-0 flex items-center gap-1 pr-2">
         <div className="flex-1 min-w-0">
           <ScrabbleScoreboard
             boardState={boardState}
@@ -441,6 +442,7 @@ export function ScrabbleGame({
             userId={user.id}
           />
         </div>
+        <Reactions gameId={game.id} playerId={user.id} compact />
         <GameChat
           gameId={game.id}
           playerId={user.id}
@@ -449,8 +451,8 @@ export function ScrabbleGame({
         />
       </div>
 
-      {/* Board — directly below scoreboard, no extra spacing */}
-      <div className="shrink-0 px-1 pt-1">
+      {/* Board — tight below scoreboard */}
+      <div className="shrink-0 px-1">
         <ScrabbleBoard
           cells={boardState.cells}
           pendingPlacements={pendingPlacements}
@@ -462,8 +464,8 @@ export function ScrabbleGame({
         />
       </div>
 
-      {/* Spacer pushes rack to bottom */}
-      <div className="flex-1" />
+      {/* Small flex spacer — just enough to keep rack near the board */}
+      <div className="flex-1 max-h-4" />
 
       {/* Rack + actions — anchored to bottom */}
       <div className="shrink-0 pb-safe">
