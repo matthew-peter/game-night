@@ -1,9 +1,9 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react';
-import { createBrowserClient } from '@supabase/ssr';
 import { User } from '@/lib/supabase/types';
 import { useGameStore } from '@/lib/store/gameStore';
+import { createClient } from '@/lib/supabase/client';
 
 interface AuthContextType {
   user: User | null;
@@ -15,19 +15,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Singleton supabase client
-let supabaseInstance: ReturnType<typeof createBrowserClient> | null = null;
-
-function getSupabase() {
-  if (!supabaseInstance) {
-    supabaseInstance = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
-  }
-  return supabaseInstance;
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -38,7 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (initialized.current) return;
     initialized.current = true;
 
-    const supabase = getSupabase();
+    const supabase = createClient();
 
     const init = async () => {
       try {
@@ -73,7 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [setStoreUser]);
 
   async function signUp(email: string, password: string, username: string): Promise<{ error?: string }> {
-    const supabase = getSupabase();
+    const supabase = createClient();
 
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -94,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signIn(email: string, password: string): Promise<{ error?: string }> {
-    const supabase = getSupabase();
+    const supabase = createClient();
 
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
@@ -117,7 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signOut(): Promise<void> {
-    const supabase = getSupabase();
+    const supabase = createClient();
     await supabase.auth.signOut();
     setUser(null);
     setStoreUser(null);
