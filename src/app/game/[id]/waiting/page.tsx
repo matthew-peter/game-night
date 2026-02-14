@@ -32,7 +32,8 @@ function WaitingRoomContent({ gameId }: { gameId: string }) {
         .single();
 
       if (error || !data) {
-        toast.error('Game not found');
+        console.error('[WaitingRoom] fetch error:', error, 'gameId:', gameId);
+        toast.error(error?.message ? `Error: ${error.message}` : 'Game not found');
         router.push('/dashboard');
         return;
       }

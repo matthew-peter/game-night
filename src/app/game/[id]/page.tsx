@@ -131,7 +131,8 @@ function GamePageContent({ gameId }: { gameId: string }) {
         .single();
 
       if (gameError || !gameData) {
-        toast.error('Game not found');
+        console.error('[GamePage] fetch error:', gameError, 'gameId:', gameId);
+        toast.error(gameError?.message ? `Error: ${gameError.message}` : 'Game not found');
         router.push('/dashboard');
         return;
       }

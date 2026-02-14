@@ -243,27 +243,29 @@ function DashboardContent() {
         };
       }
 
-      const { error } = await supabase.from('games').insert(gameInsert);
+      const insertResult = await supabase.from('games').insert(gameInsert);
+      console.log('[Dashboard] game insert result:', insertResult.status, insertResult.error);
 
-      if (error) {
-        console.error('Error creating game:', error);
-        toast.error('Failed to create game: ' + error.message);
+      if (insertResult.error) {
+        console.error('Error creating game:', insertResult.error);
+        toast.error('Failed to create game: ' + insertResult.error.message);
         return;
       }
 
       // Add creator as seat 0
-      const { error: playerError } = await supabase
+      const playerResult = await supabase
         .from('game_players')
         .insert({
           game_id: gameId,
           user_id: user.id,
           seat: 0,
         });
+      console.log('[Dashboard] game_players insert result:', playerResult.status, playerResult.error);
 
-      if (playerError) {
-        console.error('Error adding player:', playerError);
+      if (playerResult.error) {
+        console.error('Error adding player:', playerResult.error);
         await supabase.from('games').delete().eq('id', gameId);
-        toast.error('Failed to create game');
+        toast.error('Failed to join game: ' + playerResult.error.message);
         return;
       }
 
