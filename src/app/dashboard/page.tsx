@@ -7,7 +7,7 @@ import { Header } from '@/components/shared/Header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
@@ -17,43 +17,62 @@ import { getRandomWords } from '@/lib/game/words';
 import { generateKeyCard } from '@/lib/game/keyGenerator';
 import { generatePin } from '@/lib/utils/pin';
 import { countAgentsFound, countTotalAgentsNeeded } from '@/lib/game/gameLogic';
-import { ClueStrictness, Game } from '@/lib/supabase/types';
+import { ClueStrictness, Game, GamePlayer, GameType, findSeat } from '@/lib/supabase/types';
+import { createScrabbleBoardState } from '@/lib/game/scrabble/logic';
 import { toast } from 'sonner';
-import { Plus, Users, History, Play, Clock, Loader2, X, Trash2 } from 'lucide-react';
+import { Plus, Users, History, Play, Clock, Loader2, Trash2, Gamepad2 } from 'lucide-react';
 import Link from 'next/link';
+
+type GameWithPlayers = Game & {
+  game_players?: (GamePlayer & { user?: { username: string } })[];
+};
 
 function DashboardContent() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const supabase = useMemo(() => createClient(), []);
-  
+
   const [joinPin, setJoinPin] = useState('');
   const [joiningGame, setJoiningGame] = useState(false);
   const [creatingGame, setCreatingGame] = useState(false);
-  const [activeGames, setActiveGames] = useState<Array<Game & { opponent_username?: string }>>([]);
+  const [activeGames, setActiveGames] = useState<GameWithPlayers[]>([]);
   const [loadingGames, setLoadingGames] = useState(true);
-  
+
   // Game creation settings
+  const [gameType, setGameType] = useState<GameType>('codenames');
   const [timerTokens, setTimerTokens] = useState(9);
   const [clueStrictness, setClueStrictness] = useState<ClueStrictness>('basic');
   const [firstClueGiver, setFirstClueGiver] = useState<'creator' | 'joiner' | 'random'>('random');
   const [allowWordSwaps, setAllowWordSwaps] = useState(true);
   const [maxWordSwaps, setMaxWordSwaps] = useState(3);
+  const [scrabbleMaxPlayers, setScrabbleMaxPlayers] = useState(2);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
-  // Fetch active games and subscribe to changes
+  // Fetch active games
   useEffect(() => {
     if (!user) return;
 
     const fetchActiveGames = async () => {
       setLoadingGames(true);
-      
-      // Get games where user is player1 or player2 and status is 'playing' or 'waiting'
+
+      // Get game IDs where user is a player
+      const { data: myGames } = await supabase
+        .from('game_players')
+        .select('game_id')
+        .eq('user_id', user.id);
+
+      if (!myGames || myGames.length === 0) {
+        setActiveGames([]);
+        setLoadingGames(false);
+        return;
+      }
+
+      const gameIds = myGames.map(g => g.game_id);
+
       const { data: games, error } = await supabase
         .from('games')
-        .select('*')
-        .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
+        .select('*, game_players(*, user:users(username))')
+        .in('id', gameIds)
         .in('status', ['playing', 'waiting'])
         .order('created_at', { ascending: false });
 
@@ -63,29 +82,12 @@ function DashboardContent() {
         return;
       }
 
-      // Fetch opponent usernames
-      const gamesWithOpponents = await Promise.all(
-        (games || []).map(async (game) => {
-          const opponentId = game.player1_id === user.id ? game.player2_id : game.player1_id;
-          if (opponentId) {
-            const { data: opponent } = await supabase
-              .from('users')
-              .select('username')
-              .eq('id', opponentId)
-              .single();
-            return { ...game, opponent_username: opponent?.username };
-          }
-          return game;
-        })
-      );
-
-      setActiveGames(gamesWithOpponents);
+      setActiveGames(games ?? []);
       setLoadingGames(false);
     };
 
     fetchActiveGames();
 
-    // Refetch when page becomes visible (coming back from a game)
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         fetchActiveGames();
@@ -93,14 +95,12 @@ function DashboardContent() {
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // Subscribe to game deletions and updates
     const channel = supabase
       .channel('dashboard-games')
       .on(
         'postgres_changes',
         { event: 'DELETE', schema: 'public', table: 'games' },
         (payload) => {
-          // Remove deleted game from state
           setActiveGames(prev => prev.filter(g => g.id !== payload.old.id));
         }
       )
@@ -109,13 +109,11 @@ function DashboardContent() {
         { event: 'UPDATE', schema: 'public', table: 'games' },
         (payload) => {
           const updatedGame = payload.new as Game;
-          // If game is now completed or abandoned, remove from active games
           if (updatedGame.status === 'completed' || updatedGame.status === 'abandoned') {
             setActiveGames(prev => prev.filter(g => g.id !== updatedGame.id));
           } else {
-            // Update the game in state to reflect turn changes
-            setActiveGames(prev => prev.map(g => 
-              g.id === updatedGame.id 
+            setActiveGames(prev => prev.map(g =>
+              g.id === updatedGame.id
                 ? { ...g, ...updatedGame }
                 : g
             ));
@@ -133,29 +131,26 @@ function DashboardContent() {
   const handleDeleteGame = async (gameId: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     if (!confirm('Are you sure you want to delete this game? This cannot be undone.')) {
       return;
     }
 
     try {
-      // Delete moves first (foreign key constraint)
       await supabase.from('moves').delete().eq('game_id', gameId);
-      
-      // Then delete the game
-      const { error, count } = await supabase
+      await supabase.from('game_players').delete().eq('game_id', gameId);
+
+      const { error } = await supabase
         .from('games')
         .delete()
-        .eq('id', gameId)
-        .select();
-      
+        .eq('id', gameId);
+
       if (error) {
         console.error('Delete error:', error);
         toast.error('Failed to delete game');
         return;
       }
-      
-      // Remove from local state
+
       setActiveGames(prev => prev.filter(g => g.id !== gameId));
       toast.success('Game deleted');
     } catch (error) {
@@ -179,61 +174,100 @@ function DashboardContent() {
 
   const handleCreateGame = async () => {
     setCreatingGame(true);
-    
-    try {
-      const words = getRandomWords(25);
-      const keyCard = generateKeyCard();
-      const pin = generatePin();
-      
-      // Match the actual database schema
-      // current_turn represents who gives the first clue
-      // If random, pick one
-      const resolvedFirstClue = firstClueGiver === 'random' 
-        ? (Math.random() < 0.5 ? 'creator' : 'joiner')
-        : firstClueGiver;
-      
-      const boardState: Record<string, unknown> = { revealed: {} };
 
-      // If word swaps are enabled, include setup phase in board_state
-      if (allowWordSwaps) {
-        boardState.setup = {
-          enabled: true,
-          maxSwaps: maxWordSwaps,
-          player1SwapsUsed: 0,
-          player2SwapsUsed: 0,
-          player1Ready: false,
-          player2Ready: false,
+    try {
+      const pin = generatePin();
+      const gameId = crypto.randomUUID();
+
+      let gameInsert: Record<string, unknown>;
+
+      if (gameType === 'scrabble') {
+        const maxPlayers = scrabbleMaxPlayers;
+        const boardState = createScrabbleBoardState(maxPlayers);
+
+        gameInsert = {
+          id: gameId,
+          game_type: 'scrabble',
+          pin,
+          status: 'waiting',
+          current_turn: 0,
+          current_phase: 'play',
+          min_players: 2,
+          max_players: maxPlayers,
+          board_state: boardState,
+          words: [],
+          key_card: [],
+          timer_tokens: 0,
+          clue_strictness: 'basic',
+          sudden_death: false,
+        };
+      } else {
+        // Codenames
+        const words = getRandomWords(25);
+        const keyCard = generateKeyCard();
+
+        const resolvedFirstClue = firstClueGiver === 'random'
+          ? (Math.random() < 0.5 ? 'creator' : 'joiner')
+          : firstClueGiver;
+
+        const boardState: Record<string, unknown> = {
+          revealed: {},
+          agents_found: [0, 0],
+        };
+
+        if (allowWordSwaps) {
+          boardState.setup = {
+            enabled: true,
+            maxSwaps: maxWordSwaps,
+            swapsUsed: [0, 0],
+            ready: [false, false],
+          };
+        }
+
+        gameInsert = {
+          id: gameId,
+          game_type: 'codenames',
+          pin,
+          status: 'waiting',
+          key_card: keyCard,
+          words,
+          board_state: boardState,
+          timer_tokens: timerTokens,
+          clue_strictness: clueStrictness,
+          current_turn: resolvedFirstClue === 'creator' ? 0 : 1,
+          current_phase: 'clue',
+          min_players: 2,
+          max_players: 2,
+          sudden_death: false,
         };
       }
 
-      const newGame = {
-        id: crypto.randomUUID(),
-        pin,
-        status: 'waiting',
-        player1_id: user.id,
-        player2_id: null,
-        key_card: keyCard,
-        words,
-        board_state: boardState,
-        timer_tokens: timerTokens,
-        clue_strictness: clueStrictness,
-        current_turn: resolvedFirstClue === 'creator' ? 'player1' : 'player2',
-        current_phase: 'clue',
-        player1_agents_found: 0,
-        player2_agents_found: 0,
-        sudden_death: false,
-      };
-      
-      const { error } = await supabase.from('games').insert(newGame);
-      
+      const { error } = await supabase.from('games').insert(gameInsert);
+
       if (error) {
         console.error('Error creating game:', error);
         toast.error('Failed to create game: ' + error.message);
         return;
       }
-      
+
+      // Add creator as seat 0
+      const { error: playerError } = await supabase
+        .from('game_players')
+        .insert({
+          game_id: gameId,
+          user_id: user.id,
+          seat: 0,
+        });
+
+      if (playerError) {
+        console.error('Error adding player:', playerError);
+        await supabase.from('games').delete().eq('id', gameId);
+        toast.error('Failed to create game');
+        return;
+      }
+
       setShowCreateDialog(false);
-      router.push(`/game/${newGame.id}/waiting`);
+      router.push(`/game/${gameId}/waiting`);
     } catch (error) {
       console.error('Error creating game:', error);
       toast.error('Failed to create game');
@@ -244,64 +278,104 @@ function DashboardContent() {
 
   const handleJoinGame = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (joinPin.length !== 6) {
       toast.error('PIN must be 6 digits');
       return;
     }
-    
+
     setJoiningGame(true);
-    
+
     try {
-      // Find game by PIN
       const { data: game, error: fetchError } = await supabase
         .from('games')
         .select('*')
         .eq('pin', joinPin)
         .eq('status', 'waiting')
         .single();
-      
+
       if (fetchError || !game) {
         toast.error('Game not found or already started');
         return;
       }
-      
-      if (game.player1_id === user.id) {
-        // Already the creator, just go to waiting room
+
+      // Check if already in the game
+      const { data: existingPlayer } = await supabase
+        .from('game_players')
+        .select('seat')
+        .eq('game_id', game.id)
+        .eq('user_id', user.id)
+        .single();
+
+      if (existingPlayer) {
         router.push(`/game/${game.id}/waiting`);
         return;
       }
-      
-      // Join as player 2
-      const { error: updateError } = await supabase
-        .from('games')
-        .update({
-          player2_id: user.id,
-          status: 'playing',
-        })
-        .eq('id', game.id);
-      
-      if (updateError) {
+
+      // Find next available seat
+      const { data: existingPlayers } = await supabase
+        .from('game_players')
+        .select('seat')
+        .eq('game_id', game.id)
+        .order('seat', { ascending: true });
+
+      const takenSeats = new Set((existingPlayers ?? []).map(p => p.seat));
+      let nextSeat = 0;
+      while (takenSeats.has(nextSeat)) nextSeat++;
+
+      if (nextSeat >= (game.max_players ?? 2)) {
+        toast.error('Game is full');
+        return;
+      }
+
+      // Join via game_players
+      const { error: joinError } = await supabase
+        .from('game_players')
+        .insert({
+          game_id: game.id,
+          user_id: user.id,
+          seat: nextSeat,
+        });
+
+      if (joinError) {
         toast.error('Failed to join game');
         return;
       }
-      
-      // Notify player1 that someone joined
+
+      // If we have enough players, start the game
+      const currentPlayerCount = takenSeats.size + 1;
+      if (currentPlayerCount >= (game.min_players ?? 2)) {
+        await supabase
+          .from('games')
+          .update({ status: 'playing' })
+          .eq('id', game.id)
+          .eq('status', 'waiting');
+      }
+
+      // Notify other players
       try {
-        await fetch('/api/notify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            gameId: game.id,
-            userId: game.player1_id,
-            message: `${user.username || 'A player'} joined your game! Let's play!`,
-            title: 'Player Joined!'
-          }),
-        });
+        const { data: otherPlayers } = await supabase
+          .from('game_players')
+          .select('user_id')
+          .eq('game_id', game.id)
+          .neq('user_id', user.id);
+
+        for (const other of otherPlayers ?? []) {
+          await fetch('/api/notify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              gameId: game.id,
+              userId: other.user_id,
+              message: `${user.username || 'A player'} joined your game! Let's play!`,
+              title: 'Player Joined!'
+            }),
+          });
+        }
       } catch (e) {
         console.error('Failed to send join notification:', e);
       }
-      
+
       router.push(`/game/${game.id}`);
     } catch (error) {
       console.error('Error joining game:', error);
@@ -314,7 +388,7 @@ function DashboardContent() {
   return (
     <div className="min-h-screen bg-stone-50">
       <Header />
-      
+
       <main className="max-w-lg mx-auto px-4 py-4">
         <h1 className="text-xl font-bold text-stone-800 mb-4">
           Welcome, {user.username}!
@@ -335,15 +409,47 @@ function DashboardContent() {
               ) : (
                 <div className="space-y-2">
                   {activeGames.map((game) => {
-                    const amIClueGiver = (game.current_turn === 'player1' && game.player1_id === user.id) ||
-                                         (game.current_turn === 'player2' && game.player2_id === user.id);
-                    const isCluePhase = game.current_phase === 'clue';
-                    // My turn = I'm clue giver and it's clue phase, OR I'm guesser and it's guess phase
-                    const isYourTurn = (amIClueGiver && isCluePhase) || (!amIClueGiver && !isCluePhase);
+                    const gamePlayers = game.game_players ?? [];
+                    const mySeat = findSeat(gamePlayers, user.id);
+                    const opponents = gamePlayers.filter(p => p.user_id !== user.id);
+                    const opponentNames = opponents.map(p => p.user?.username).filter(Boolean);
+                    const isScrabble = game.game_type === 'scrabble';
+
+                    // Turn detection
+                    let isYourTurn = false;
+                    if (isScrabble) {
+                      isYourTurn = game.current_turn === mySeat;
+                    } else {
+                      const amIClueGiver = game.current_turn === mySeat;
+                      const isCluePhase = game.current_phase === 'clue';
+                      isYourTurn = (amIClueGiver && isCluePhase) || (!amIClueGiver && !isCluePhase);
+                    }
                     const isWaiting = game.status === 'waiting';
-                    const agentsFound = countAgentsFound(game.board_state);
-                    const totalAgents = countTotalAgentsNeeded(game.key_card);
-                    
+
+                    // Game-specific progress info
+                    let progressText = '';
+                    let turnText = '';
+                    if (!isWaiting) {
+                      if (isScrabble) {
+                        const bs = game.board_state as unknown as Record<string, unknown>;
+                        const scores = (bs.scores as number[]) ?? [];
+                        const myScore = mySeat !== undefined ? scores[mySeat] ?? 0 : 0;
+                        progressText = `Score: ${myScore}`;
+                        turnText = isYourTurn ? 'Your turn' : "Opponent's turn";
+                      } else {
+                        const agentsFound = countAgentsFound(game.board_state);
+                        const totalAgents = countTotalAgentsNeeded(game.key_card);
+                        progressText = `${agentsFound}/${totalAgents} found`;
+                        const isCluePhase = game.current_phase === 'clue';
+                        turnText = isYourTurn
+                          ? `Your turn (${isCluePhase ? 'clue' : 'guess'})`
+                          : 'Their turn';
+                      }
+                    }
+
+                    const gameTypeLabel = isScrabble ? 'Scrabble' : 'Codenames';
+                    const gameTypeColor = isScrabble ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700';
+
                     return (
                       <div
                         key={game.id}
@@ -354,8 +460,13 @@ function DashboardContent() {
                           className="flex-1 min-w-0"
                         >
                           <div className="flex items-center gap-2">
+                            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${gameTypeColor}`}>
+                              {gameTypeLabel}
+                            </span>
                             <span className="font-medium text-stone-800 truncate">
-                              {isWaiting ? 'Waiting for player...' : `w/ ${game.opponent_username || 'Partner'}`}
+                              {isWaiting
+                                ? 'Waiting for players...'
+                                : `w/ ${opponentNames.join(', ') || 'Opponents'}`}
                             </span>
                             {isWaiting && (
                               <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded">
@@ -367,17 +478,17 @@ function DashboardContent() {
                             {!isWaiting && (
                               <>
                                 <span className="text-xs text-stone-400">
-                                  {agentsFound}/{totalAgents} found
+                                  {progressText}
                                 </span>
                                 <span className="text-xs">
                                   {isYourTurn ? (
                                     <span className="text-emerald-600 font-medium">
-                                      Your turn ({isCluePhase ? 'clue' : 'guess'})
+                                      {turnText}
                                     </span>
                                   ) : (
                                     <span className="text-stone-400 flex items-center gap-1">
                                       <Clock className="h-3 w-3" />
-                                      Their turn
+                                      {turnText}
                                     </span>
                                   )}
                                 </span>
@@ -391,9 +502,9 @@ function DashboardContent() {
                               {isWaiting ? 'View' : 'Resume'}
                             </Button>
                           </Link>
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
+                          <Button
+                            size="sm"
+                            variant="ghost"
                             className="text-stone-400 hover:text-red-600 hover:bg-red-50 p-2"
                             onClick={(e) => handleDeleteGame(game.id, e)}
                           >
@@ -408,7 +519,7 @@ function DashboardContent() {
             </CardContent>
           </Card>
         )}
-        
+
         {/* Create Game */}
         <Card className="mb-3">
           <CardContent className="p-3">
@@ -424,123 +535,174 @@ function DashboardContent() {
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Game Settings</DialogTitle>
-                  <DialogDescription>
-                    Configure your game before starting
-                  </DialogDescription>
-                </DialogHeader>
-                
-                <div className="space-y-6 py-4">
-                  {/* Timer tokens */}
-                  <div className="space-y-3">
-                    <Label>Timer Tokens: {timerTokens}</Label>
-                    <Slider
-                      value={[timerTokens]}
-                      onValueChange={(v) => setTimerTokens(v[0])}
-                      min={7}
-                      max={11}
-                      step={1}
-                      className="w-full"
-                    />
-                    <p className="text-xs text-stone-500">
-                      Standard: 9 tokens. More = easier, fewer = harder.
-                    </p>
-                  </div>
-                  
-                  {/* Clue strictness */}
-                  <div className="space-y-2">
-                    <Label>Clue Validation</Label>
-                    <Select
-                      value={clueStrictness}
-                      onValueChange={(v) => setClueStrictness(v as ClueStrictness)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="basic">
-                          Basic - Clue can&apos;t be exact word on board
-                        </SelectItem>
-                        <SelectItem value="strict">
-                          Strict - No substrings allowed
-                        </SelectItem>
-                        <SelectItem value="very_strict">
-                          Very Strict - No shared word roots
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  {/* First clue giver */}
-                  <div className="space-y-2">
-                    <Label>Who gives the first clue?</Label>
-                    <Select
-                      value={firstClueGiver}
-                      onValueChange={(v) => setFirstClueGiver(v as 'creator' | 'joiner' | 'random')}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="creator">
-                          Me (game creator)
-                        </SelectItem>
-                        <SelectItem value="joiner">
-                          My partner (who joins)
-                        </SelectItem>
-                        <SelectItem value="random">
-                          🎲 Random
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {/* Word swaps - for playing with kids or unfamiliar words */}
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <Label>Word Swaps</Label>
-                        <p className="text-xs text-stone-500 mt-0.5">
-                          Let players swap out words they don&apos;t know before the game starts
-                        </p>
+                  <DialogHeader>
+                    <DialogTitle>Create New Game</DialogTitle>
+                    <DialogDescription>
+                      Choose a game and configure settings
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  <div className="space-y-6 py-4">
+                    {/* Game Type Selector */}
+                    <div className="space-y-2">
+                      <Label>Game</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => setGameType('codenames')}
+                          className={`p-3 rounded-lg border-2 text-left transition-all ${
+                            gameType === 'codenames'
+                              ? 'border-green-600 bg-green-50'
+                              : 'border-stone-200 hover:border-stone-300'
+                          }`}
+                        >
+                          <div className="font-medium text-sm">Codenames Duet</div>
+                          <div className="text-xs text-stone-500 mt-0.5">2 players • Co-op word game</div>
+                        </button>
+                        <button
+                          onClick={() => setGameType('scrabble')}
+                          className={`p-3 rounded-lg border-2 text-left transition-all ${
+                            gameType === 'scrabble'
+                              ? 'border-amber-600 bg-amber-50'
+                              : 'border-stone-200 hover:border-stone-300'
+                          }`}
+                        >
+                          <div className="font-medium text-sm">Scrabble</div>
+                          <div className="text-xs text-stone-500 mt-0.5">2-4 players • Word building</div>
+                        </button>
                       </div>
-                      <Switch
-                        checked={allowWordSwaps}
-                        onCheckedChange={setAllowWordSwaps}
-                      />
                     </div>
-                    {allowWordSwaps && (
-                      <div className="space-y-2 pl-1">
-                        <Label className="text-sm">Max swaps per player: {maxWordSwaps}</Label>
-                        <Slider
-                          value={[maxWordSwaps]}
-                          onValueChange={(v) => setMaxWordSwaps(v[0])}
-                          min={1}
-                          max={5}
-                          step={1}
-                          className="w-full"
-                        />
-                        <p className="text-xs text-stone-500">
-                          Each player can independently swap up to {maxWordSwaps} word{maxWordSwaps !== 1 ? 's' : ''} before playing.
-                        </p>
+
+                    {/* Scrabble Settings */}
+                    {gameType === 'scrabble' && (
+                      <div className="space-y-3">
+                        <div className="space-y-2">
+                          <Label>Number of Players: {scrabbleMaxPlayers}</Label>
+                          <Slider
+                            value={[scrabbleMaxPlayers]}
+                            onValueChange={(v) => setScrabbleMaxPlayers(v[0])}
+                            min={2}
+                            max={4}
+                            step={1}
+                            className="w-full"
+                          />
+                          <p className="text-xs text-stone-500">
+                            Game starts when {scrabbleMaxPlayers} players have joined.
+                          </p>
+                        </div>
                       </div>
                     )}
+
+                    {/* Codenames Settings */}
+                    {gameType === 'codenames' && (
+                      <>
+                        <div className="space-y-3">
+                          <Label>Timer Tokens: {timerTokens}</Label>
+                          <Slider
+                            value={[timerTokens]}
+                            onValueChange={(v) => setTimerTokens(v[0])}
+                            min={7}
+                            max={11}
+                            step={1}
+                            className="w-full"
+                          />
+                          <p className="text-xs text-stone-500">
+                            Standard: 9 tokens. More = easier, fewer = harder.
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Clue Validation</Label>
+                          <Select
+                            value={clueStrictness}
+                            onValueChange={(v) => setClueStrictness(v as ClueStrictness)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="basic">
+                                Basic - Clue can&apos;t be exact word on board
+                              </SelectItem>
+                              <SelectItem value="strict">
+                                Strict - No substrings allowed
+                              </SelectItem>
+                              <SelectItem value="very_strict">
+                                Very Strict - No shared word roots
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Who gives the first clue?</Label>
+                          <Select
+                            value={firstClueGiver}
+                            onValueChange={(v) => setFirstClueGiver(v as 'creator' | 'joiner' | 'random')}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="creator">
+                                Me (game creator)
+                              </SelectItem>
+                              <SelectItem value="joiner">
+                                My partner (who joins)
+                              </SelectItem>
+                              <SelectItem value="random">
+                                Random
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <Label>Word Swaps</Label>
+                              <p className="text-xs text-stone-500 mt-0.5">
+                                Let players swap out words they don&apos;t know before the game starts
+                              </p>
+                            </div>
+                            <Switch
+                              checked={allowWordSwaps}
+                              onCheckedChange={setAllowWordSwaps}
+                            />
+                          </div>
+                          {allowWordSwaps && (
+                            <div className="space-y-2 pl-1">
+                              <Label className="text-sm">Max swaps per player: {maxWordSwaps}</Label>
+                              <Slider
+                                value={[maxWordSwaps]}
+                                onValueChange={(v) => setMaxWordSwaps(v[0])}
+                                min={1}
+                                max={5}
+                                step={1}
+                                className="w-full"
+                              />
+                              <p className="text-xs text-stone-500">
+                                Each player can independently swap up to {maxWordSwaps} word{maxWordSwaps !== 1 ? 's' : ''} before playing.
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
-                </div>
-                
-                <Button
-                  onClick={handleCreateGame}
-                  disabled={creatingGame}
-                  className="w-full bg-green-600 hover:bg-green-700"
-                >
-                  {creatingGame ? 'Creating...' : 'Start Game'}
-                </Button>
-              </DialogContent>
-            </Dialog>
+
+                  <Button
+                    onClick={handleCreateGame}
+                    disabled={creatingGame}
+                    className={`w-full ${gameType === 'scrabble' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-green-600 hover:bg-green-700'}`}
+                  >
+                    {creatingGame ? 'Creating...' : `Start ${gameType === 'scrabble' ? 'Scrabble' : 'Codenames'} Game`}
+                  </Button>
+                </DialogContent>
+              </Dialog>
             </div>
           </CardContent>
         </Card>
-        
+
         {/* Join Game */}
         <Card className="mb-3">
           <CardContent className="p-3">
@@ -572,7 +734,7 @@ function DashboardContent() {
             </form>
           </CardContent>
         </Card>
-        
+
         {/* Game History */}
         <Card>
           <CardContent className="p-3">

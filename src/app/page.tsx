@@ -32,13 +32,10 @@ function LandingContent() {
         {/* Hero */}
         <div className="text-center mb-12">
           <h1 className="text-4xl sm:text-5xl font-bold text-green-600 mb-2">
-            CODENAMES
+            GAME NIGHT
           </h1>
-          <div className="inline-block bg-green-600 text-white px-4 py-1 rounded-full text-lg font-semibold mb-6">
-            DUET
-          </div>
           <p className="text-stone-600 text-lg max-w-md mx-auto">
-            Play the cooperative word game with a friend. Give clues, guess words, find all the agents!
+            Play board games online with friends and family. Start with Codenames Duet &mdash; more games coming soon!
           </p>
         </div>
 
@@ -58,16 +55,15 @@ function LandingContent() {
             <p className="text-sm text-stone-500">Mobile-first design, play from any device</p>
           </div>
           <div className="p-4">
-            <div className="text-3xl mb-2">🔗</div>
-            <h3 className="font-semibold text-stone-800 mb-1">Easy Sharing</h3>
-            <p className="text-sm text-stone-500">Invite friends with a simple link</p>
+            <div className="text-3xl mb-2">🎲</div>
+            <h3 className="font-semibold text-stone-800 mb-1">Multiple Games</h3>
+            <p className="text-sm text-stone-500">Growing collection of games for 2-4 players</p>
           </div>
         </div>
 
         {/* Footer */}
         <div className="mt-16 text-center text-sm text-stone-400">
-          <p>Based on Codenames Duet by Vlaada Chvátil & Scot Eaton</p>
-          <p>Published by Czech Games Edition</p>
+          <p>Codenames Duet by Vlaada Chv&aacute;til &amp; Scot Eaton, published by Czech Games Edition</p>
         </div>
       </div>
     </div>

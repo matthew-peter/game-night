@@ -2,55 +2,47 @@ import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { validateClue } from '@/lib/game/clueValidator';
 import { getCardTypeForPlayer } from '@/lib/game/keyGenerator';
-import { isWordRevealed, getNextTurn, getRemainingAgentsPerPlayer, countTotalAgentsNeeded } from '@/lib/game/gameLogic';
-import { BoardState, KeyCard, ClueStrictness, CurrentTurn, RevealedCard } from '@/lib/supabase/types';
+import { isWordRevealed, getNextSeat, getRemainingAgentsPerSeat, countTotalAgentsNeeded } from '@/lib/game/gameLogic';
+import { BoardState, KeyCard, ClueStrictness, Seat, RevealedCard } from '@/lib/supabase/types';
 
 /**
  * After a move that transitions to 'clue' phase, check if the new clue-giver
  * actually has agents left on their key. If not, auto-skip so the game doesn't
- * get stuck. This runs server-side so both players always see the same result.
+ * get stuck.
  */
 function resolveCluePhase(
   updateData: Record<string, unknown>,
   words: string[],
   keyCard: KeyCard,
   boardState: BoardState,
-  newClueGiver: CurrentTurn,
-  inSuddenDeath: boolean
+  newClueGiverSeat: Seat,
+  inSuddenDeath: boolean,
+  playerCount: number = 2
 ) {
-  // Build a temporary game-like object to compute remaining agents
   const tempGame = {
     words,
     key_card: keyCard,
     board_state: boardState,
-  } as Parameters<typeof getRemainingAgentsPerPlayer>[0];
-  const remaining = getRemainingAgentsPerPlayer(tempGame);
+  } as Parameters<typeof getRemainingAgentsPerSeat>[0];
+  const remaining = getRemainingAgentsPerSeat(tempGame);
 
-  const clueGiverRemaining = newClueGiver === 'player1' ? remaining.player1 : remaining.player2;
-  const otherPlayer = getNextTurn(newClueGiver);
-  const otherRemaining = newClueGiver === 'player1' ? remaining.player2 : remaining.player1;
+  const clueGiverRemaining = remaining[newClueGiverSeat] ?? 0;
+  const otherSeat = getNextSeat(newClueGiverSeat, playerCount);
+  const otherRemaining = remaining[otherSeat] ?? 0;
 
   if (inSuddenDeath) {
-    // In sudden death, skip straight to guess phase.
-    // Figure out which side still needs guessing.
     if (clueGiverRemaining > 0) {
-      // The other player should guess my (clue-giver's) key
-      updateData.current_turn = newClueGiver;
+      updateData.current_turn = newClueGiverSeat;
       updateData.current_phase = 'guess';
     } else if (otherRemaining > 0) {
-      // I (clue-giver) should guess the other player's key
-      updateData.current_turn = otherPlayer;
+      updateData.current_turn = otherSeat;
       updateData.current_phase = 'guess';
     }
-    // If both are 0, the game should already be won (handled elsewhere)
   } else if (clueGiverRemaining === 0) {
-    // Normal play: clue-giver has no agents left → auto-skip to the other player's clue
-    // But first check if the OTHER player also has no agents (shouldn't happen if game isn't won)
     if (otherRemaining > 0) {
-      updateData.current_turn = otherPlayer;
+      updateData.current_turn = otherSeat;
       updateData.current_phase = 'clue';
-      // Recursively resolve in case the other player also has 0 (edge case)
-      resolveCluePhase(updateData, words, keyCard, boardState, otherPlayer, inSuddenDeath);
+      resolveCluePhase(updateData, words, keyCard, boardState, otherSeat, inSuddenDeath, playerCount);
     }
   }
 }
@@ -62,7 +54,7 @@ export async function POST(
   try {
     const { id } = await params;
     const supabase = await createClient();
-    
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -71,7 +63,7 @@ export async function POST(
     const body = await request.json();
     const { moveType, clueWord, intendedWords, guessIndex } = body;
 
-    // Get the game - use type assertion since we know the schema
+    // Get the game
     const { data: gameData, error: fetchError } = await supabase
       .from('games')
       .select('*')
@@ -82,45 +74,44 @@ export async function POST(
       return NextResponse.json({ error: 'Game not found' }, { status: 404 });
     }
 
-    // Type assertion for game data - matches actual DB schema
     const game = gameData as unknown as {
       id: string;
       status: string;
-      player1_id: string;
-      player2_id: string | null;
       words: string[];
       key_card: KeyCard;
       board_state: BoardState;
       timer_tokens: number;
-      current_turn: CurrentTurn;
+      current_turn: Seat;
       current_phase: string;
       current_clue_id: string | null;
       clue_strictness: ClueStrictness;
       sudden_death: boolean;
-      player1_agents_found: number;
-      player2_agents_found: number;
     };
 
-    // Check if game is in playing status
     if (game.status !== 'playing') {
       return NextResponse.json({ error: 'Game is not in progress' }, { status: 400 });
     }
 
-    // Determine player role
-    const isPlayer1 = game.player1_id === user.id;
-    const isPlayer2 = game.player2_id === user.id;
-    
-    if (!isPlayer1 && !isPlayer2) {
+    // Look up the user's seat from game_players
+    const { data: playerRow } = await supabase
+      .from('game_players')
+      .select('seat')
+      .eq('game_id', id)
+      .eq('user_id', user.id)
+      .single();
+
+    if (!playerRow) {
       return NextResponse.json({ error: 'You are not in this game' }, { status: 403 });
     }
 
-    const playerRole: CurrentTurn = isPlayer1 ? 'player1' : 'player2';
-    const currentTurn = game.current_turn;
+    const mySeat: Seat = playerRow.seat;
+    const currentTurn: Seat = game.current_turn;
+    const playerCount = game.key_card.length; // 2 for Codenames Duet
 
     // Handle different move types
     if (moveType === 'clue') {
-      // Clue giver is the player whose turn it is
-      if (currentTurn !== playerRole) {
+      // Clue giver is the player whose turn it is (current_turn seat)
+      if (currentTurn !== mySeat) {
         return NextResponse.json({ error: "It's not your turn to give a clue" }, { status: 400 });
       }
 
@@ -128,24 +119,16 @@ export async function POST(
         return NextResponse.json({ error: 'Not in clue phase' }, { status: 400 });
       }
 
-      // Cannot give clues in sudden death
       if (game.sudden_death || game.timer_tokens <= 0) {
         return NextResponse.json({ error: 'Cannot give clues in sudden death' }, { status: 400 });
       }
 
-      // Validate clue
       const visibleWords = game.words.filter(word => !isWordRevealed(word, game.board_state));
-      const validation = validateClue(
-        clueWord,
-        visibleWords,
-        game.clue_strictness
-      );
-
+      const validation = validateClue(clueWord, visibleWords, game.clue_strictness);
       if (!validation.valid) {
         return NextResponse.json({ error: validation.reason }, { status: 400 });
       }
 
-      // Create the move
       const { data: moveData, error: moveError } = await supabase
         .from('moves')
         .insert({
@@ -164,21 +147,18 @@ export async function POST(
         return NextResponse.json({ error: 'Failed to save move' }, { status: 500 });
       }
 
-      // Deduct a timer token for giving a clue (each clue = 1 round)
       const newTokens = game.timer_tokens - 1;
-      
       const updateData: Record<string, unknown> = {
         current_clue_id: moveData.id,
         current_phase: 'guess',
         timer_tokens: newTokens,
       };
-      
-      // Check if out of tokens (sudden death)
+
       if (newTokens <= 0) {
         updateData.timer_tokens = 0;
         updateData.sudden_death = true;
       }
-      
+
       const { error: updateError } = await supabase
         .from('games')
         .update(updateData)
@@ -193,9 +173,9 @@ export async function POST(
     }
 
     if (moveType === 'guess') {
-      // Guesser is the OTHER player (not current turn)
-      const guesserRole = currentTurn === 'player1' ? 'player2' : 'player1';
-      if (playerRole !== guesserRole) {
+      // Guesser is the OTHER player (not current_turn)
+      const guesserSeat = getNextSeat(currentTurn, playerCount);
+      if (mySeat !== guesserSeat) {
         return NextResponse.json({ error: "It's not your turn to guess" }, { status: 400 });
       }
 
@@ -209,33 +189,30 @@ export async function POST(
 
       const guessedWord = game.words[guessIndex];
       const existingReveal = game.board_state.revealed[guessedWord];
-      
-      // Determine card type for the clue giver (current turn player)
+
+      // Determine card type from the clue giver's perspective
       const cardType = getCardTypeForPlayer(guessIndex, game.key_card, currentTurn);
-      
-      // Check if card can be guessed:
-      // - Not revealed at all, OR
-      // - Revealed as bystander but still an agent on the clue giver's key
+
       if (existingReveal) {
         const isStillAgentToFind = existingReveal.type !== 'agent' && cardType === 'agent';
         if (!isStillAgentToFind) {
           return NextResponse.json({ error: 'Card already revealed' }, { status: 400 });
         }
       }
-      
-      // Update board state - if it was already revealed as bystander but is now found as agent,
-      // update the reveal to show it as agent
+
       const newRevealed: Record<string, RevealedCard> = {
         ...game.board_state.revealed,
         [guessedWord]: {
           type: cardType,
-          guessedBy: guesserRole
-        }
+          guessedBy: guesserSeat,
+        },
       };
 
-      const newBoardState: BoardState = { revealed: newRevealed };
+      const newBoardState: BoardState = {
+        ...game.board_state,
+        revealed: newRevealed,
+      };
 
-      // Create the guess move
       const { error: moveError } = await supabase
         .from('moves')
         .insert({
@@ -252,44 +229,34 @@ export async function POST(
         return NextResponse.json({ error: 'Failed to save move' }, { status: 500 });
       }
 
-      // Build update data
       const updateData: Record<string, unknown> = {
         board_state: newBoardState,
       };
 
-      // Check game end conditions
       const assassinHit = cardType === 'assassin';
-      
-      // Check win by counting agents found
       const agentsFound = Object.values(newBoardState.revealed).filter(r => r.type === 'agent').length;
       const totalAgentsNeeded = countTotalAgentsNeeded(game.key_card);
       const won = agentsFound >= totalAgentsNeeded;
-      
       const suddenDeath = game.sudden_death || game.timer_tokens <= 0;
       const suddenDeathLoss = suddenDeath && cardType === 'bystander';
 
       if (assassinHit || suddenDeathLoss) {
-        // Game over - loss
         updateData.status = 'completed';
         updateData.result = 'loss';
         updateData.ended_at = new Date().toISOString();
       } else if (won) {
-        // Game over - win!
         updateData.status = 'completed';
         updateData.result = 'win';
         updateData.ended_at = new Date().toISOString();
       } else if (cardType !== 'agent') {
-        // Wrong guess (bystander) - switch turns (token already deducted when clue was given)
-        const newClueGiver = getNextTurn(currentTurn);
-        updateData.current_turn = newClueGiver;
+        // Wrong guess — switch turns
+        const newClueGiverSeat = getNextSeat(currentTurn, playerCount);
+        updateData.current_turn = newClueGiverSeat;
         updateData.current_phase = 'clue';
-        // Auto-skip if the new clue-giver has no agents left
-        resolveCluePhase(updateData, game.words, game.key_card, newBoardState, newClueGiver, suddenDeath);
+        resolveCluePhase(updateData, game.words, game.key_card, newBoardState, newClueGiverSeat, suddenDeath, playerCount);
       } else if (suddenDeath) {
         // Agent found in sudden death — check if more agents remain on this side
-        // If not, auto-switch so the other player guesses on the remaining side
-        const currentSideAgents = currentTurn === 'player1'
-          ? game.key_card.player1.agents : game.key_card.player2.agents;
+        const currentSideAgents = game.key_card[currentTurn]?.agents ?? [];
         const agentsLeftOnCurrentSide = currentSideAgents.filter(idx => {
           const w = game.words[idx];
           const rev = newBoardState.revealed[w];
@@ -297,11 +264,9 @@ export async function POST(
         }).length;
 
         if (agentsLeftOnCurrentSide === 0) {
-          // No more agents on this side — switch so other player guesses the other side
-          updateData.current_turn = getNextTurn(currentTurn);
+          updateData.current_turn = getNextSeat(currentTurn, playerCount);
         }
       }
-      // If agent found (non-sudden-death), continue guessing (don't update turn)
 
       const { error: updateError } = await supabase
         .from('games')
@@ -313,7 +278,7 @@ export async function POST(
         return NextResponse.json({ error: 'Failed to update game' }, { status: 500 });
       }
 
-      return NextResponse.json({ 
+      return NextResponse.json({
         success: true,
         cardType,
         gameOver: assassinHit || won || suddenDeathLoss,
@@ -323,8 +288,8 @@ export async function POST(
 
     if (moveType === 'end_turn') {
       // Guesser is the OTHER player
-      const guesserRole = currentTurn === 'player1' ? 'player2' : 'player1';
-      if (playerRole !== guesserRole) {
+      const guesserSeat = getNextSeat(currentTurn, playerCount);
+      if (mySeat !== guesserSeat) {
         return NextResponse.json({ error: "It's not your turn" }, { status: 400 });
       }
 
@@ -332,7 +297,6 @@ export async function POST(
         return NextResponse.json({ error: 'Not in guess phase' }, { status: 400 });
       }
 
-      // Create the end turn move
       const { error: moveError } = await supabase
         .from('moves')
         .insert({
@@ -345,16 +309,13 @@ export async function POST(
         console.error('Error creating move:', moveError);
       }
 
-      // Token already deducted when clue was given
       const inSuddenDeath = game.sudden_death || game.timer_tokens <= 0;
 
       if (inSuddenDeath) {
-        // In sudden death, check if the other player has agents to find
-        // before allowing the pass
-        const newTurn = getNextTurn(currentTurn);
-        const gameForCalc = game as unknown as Parameters<typeof getRemainingAgentsPerPlayer>[0];
-        const remaining = getRemainingAgentsPerPlayer(gameForCalc);
-        const agentsOnNewSide = newTurn === 'player1' ? remaining.player1 : remaining.player2;
+        const newTurnSeat = getNextSeat(currentTurn, playerCount);
+        const tempGame = game as unknown as Parameters<typeof getRemainingAgentsPerSeat>[0];
+        const remaining = getRemainingAgentsPerSeat(tempGame);
+        const agentsOnNewSide = remaining[newTurnSeat] ?? 0;
 
         if (agentsOnNewSide === 0) {
           return NextResponse.json(
@@ -364,15 +325,14 @@ export async function POST(
         }
       }
 
-      const newClueGiver = getNextTurn(currentTurn);
+      const newClueGiverSeat = getNextSeat(currentTurn, playerCount);
       const updateData: Record<string, unknown> = {
-        current_turn: newClueGiver,
+        current_turn: newClueGiverSeat,
         current_phase: inSuddenDeath ? 'guess' : 'clue',
       };
 
-      // Auto-skip if the new clue-giver has no agents left
       if (!inSuddenDeath) {
-        resolveCluePhase(updateData, game.words, game.key_card, game.board_state, newClueGiver, false);
+        resolveCluePhase(updateData, game.words, game.key_card, game.board_state, newClueGiverSeat, false, playerCount);
       }
 
       const { error: updateError } = await supabase

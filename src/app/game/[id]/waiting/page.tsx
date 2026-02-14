@@ -94,8 +94,8 @@ function WaitingRoomContent({ gameId }: { gameId: string }) {
     
     const shareUrl = `${window.location.origin}/join/${game.pin}`;
     const shareData = {
-      title: 'Codenames Duet',
-      text: `Join my Codenames Duet game! PIN: ${game.pin}`,
+      title: 'Game Night',
+      text: `Join my game! PIN: ${game.pin}`,
       url: shareUrl,
     };
 
@@ -151,9 +151,14 @@ function WaitingRoomContent({ gameId }: { gameId: string }) {
       <main className="max-w-lg mx-auto px-4 py-8">
         <Card>
           <CardHeader className="text-center">
-            <CardTitle className="text-2xl">Waiting for Player 2</CardTitle>
+            <CardTitle className="text-2xl">
+              {game.game_type === 'scrabble' ? 'Scrabble' : 'Codenames Duet'}
+            </CardTitle>
             <CardDescription>
-              Share the PIN or link with your friend to start playing
+              {game.game_type === 'scrabble'
+                ? `Waiting for players (need ${game.min_players ?? 2})`
+                : 'Waiting for Player 2'}
+              {' — '}Share the PIN or link to start
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -161,7 +166,7 @@ function WaitingRoomContent({ gameId }: { gameId: string }) {
             <div className="text-center">
               <p className="text-sm text-stone-500 mb-2">Game PIN</p>
               <div className="flex items-center justify-center gap-2">
-                <span className="text-4xl font-mono font-bold tracking-[0.3em] text-green-600">
+                <span className={`text-4xl font-mono font-bold tracking-[0.3em] ${game.game_type === 'scrabble' ? 'text-amber-600' : 'text-green-600'}`}>
                   {game.pin}
                 </span>
                 <Button
@@ -181,7 +186,7 @@ function WaitingRoomContent({ gameId }: { gameId: string }) {
 
             {/* Waiting animation */}
             <div className="flex items-center justify-center gap-2 py-4">
-              <Loader2 className="h-5 w-5 animate-spin text-green-600" />
+              <Loader2 className={`h-5 w-5 animate-spin ${game.game_type === 'scrabble' ? 'text-amber-600' : 'text-green-600'}`} />
               <span className="text-stone-600">Waiting for opponent to join...</span>
             </div>
 
@@ -189,23 +194,31 @@ function WaitingRoomContent({ gameId }: { gameId: string }) {
             <div className="bg-stone-100 rounded-lg p-4 text-sm">
               <h4 className="font-medium text-stone-700 mb-2">Game Settings</h4>
               <div className="grid grid-cols-2 gap-2 text-stone-600">
-                <span>Timer Tokens:</span>
-                <span className="font-medium">{game.timer_tokens}</span>
-                <span>Clue Rules:</span>
-                <span className="font-medium capitalize">{game.clue_strictness.replace('_', ' ')}</span>
-                <span>Word Swaps:</span>
-                <span className="font-medium">
-                  {game.board_state.setup?.enabled
-                    ? `${game.board_state.setup.maxSwaps} per player`
-                    : 'Off'}
-                </span>
+                <span>Game:</span>
+                <span className="font-medium capitalize">{game.game_type === 'scrabble' ? 'Scrabble' : 'Codenames Duet'}</span>
+                <span>Players:</span>
+                <span className="font-medium">{game.max_players ?? 2}</span>
+                {game.game_type === 'codenames' && (
+                  <>
+                    <span>Timer Tokens:</span>
+                    <span className="font-medium">{game.timer_tokens}</span>
+                    <span>Clue Rules:</span>
+                    <span className="font-medium capitalize">{game.clue_strictness?.replace('_', ' ') ?? 'basic'}</span>
+                    <span>Word Swaps:</span>
+                    <span className="font-medium">
+                      {game.board_state.setup?.enabled
+                        ? `${game.board_state.setup.maxSwaps} per player`
+                        : 'Off'}
+                    </span>
+                  </>
+                )}
               </div>
             </div>
 
             {/* Share button */}
             <Button
               onClick={handleShare}
-              className="w-full bg-green-600 hover:bg-green-700"
+              className={`w-full ${game.game_type === 'scrabble' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-green-600 hover:bg-green-700'}`}
             >
               <Share2 className="h-4 w-4 mr-2" />
               Share Invite Link

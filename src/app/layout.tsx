@@ -15,13 +15,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Codenames Duet",
-  description: "Play Codenames Duet online with a friend",
+  title: "Game Night",
+  description: "Play board games online with friends and family",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Codenames",
+    title: "Game Night",
   },
   icons: {
     icon: "/icon-192.png",

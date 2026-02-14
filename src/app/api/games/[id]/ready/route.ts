@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
-import { BoardState, CurrentTurn } from '@/lib/supabase/types';
+import { BoardState, Seat } from '@/lib/supabase/types';
 
 export async function POST(
   request: Request,
@@ -10,9 +10,7 @@ export async function POST(
     const { id } = await params;
     const supabase = await createClient();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -31,54 +29,49 @@ export async function POST(
     const game = gameData as unknown as {
       id: string;
       status: string;
-      player1_id: string;
-      player2_id: string | null;
       board_state: BoardState;
     };
 
-    // Must be a player in this game
-    const isPlayer1 = game.player1_id === user.id;
-    const isPlayer2 = game.player2_id === user.id;
-    if (!isPlayer1 && !isPlayer2) {
-      return NextResponse.json(
-        { error: 'You are not in this game' },
-        { status: 403 }
-      );
+    // Look up seat
+    const { data: playerRow } = await supabase
+      .from('game_players')
+      .select('seat')
+      .eq('game_id', id)
+      .eq('user_id', user.id)
+      .single();
+
+    if (!playerRow) {
+      return NextResponse.json({ error: 'You are not in this game' }, { status: 403 });
     }
 
+    const mySeat: Seat = playerRow.seat;
+
     if (game.status !== 'playing') {
-      return NextResponse.json(
-        { error: 'Game is not in progress' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Game is not in progress' }, { status: 400 });
     }
 
     const setup = game.board_state.setup;
     if (!setup || !setup.enabled) {
-      return NextResponse.json(
-        { error: 'No setup phase for this game' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'No setup phase for this game' }, { status: 400 });
     }
 
-    const playerRole: CurrentTurn = isPlayer1 ? 'player1' : 'player2';
+    // Mark this seat as ready
+    const newReady = [...setup.ready];
+    newReady[mySeat] = true;
 
-    // Mark this player as ready
-    const newSetup = { ...setup };
-    if (playerRole === 'player1') {
-      newSetup.player1Ready = true;
-    } else {
-      newSetup.player2Ready = true;
-    }
-
-    // If both players are now ready, remove the setup phase
-    const bothReady = newSetup.player1Ready && newSetup.player2Ready;
+    // Check if all players are now ready
+    const bothReady = newReady.every(Boolean);
 
     const newBoardState: BoardState = {
-      revealed: game.board_state.revealed,
-      // If both ready, omit setup entirely — game begins
-      ...(bothReady ? {} : { setup: newSetup }),
+      ...game.board_state,
+      ...(bothReady
+        ? { setup: undefined } // Remove setup — game begins
+        : { setup: { ...setup, ready: newReady } }),
     };
+    // Clean up undefined key for JSON
+    if (bothReady) {
+      delete newBoardState.setup;
+    }
 
     const { error: updateError } = await supabase
       .from('games')
@@ -87,21 +80,12 @@ export async function POST(
 
     if (updateError) {
       console.error('Error marking ready:', updateError);
-      return NextResponse.json(
-        { error: 'Failed to update ready status' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Failed to update ready status' }, { status: 500 });
     }
 
-    return NextResponse.json({
-      success: true,
-      bothReady,
-    });
+    return NextResponse.json({ success: true, bothReady });
   } catch (error) {
     console.error('Error in POST /api/games/[id]/ready:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

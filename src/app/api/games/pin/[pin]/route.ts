@@ -8,16 +8,16 @@ export async function GET(
   try {
     const { pin } = await params;
     const supabase = await createClient();
-    
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Find game by PIN
+    // Find game by PIN — include player count for the caller
     const { data: game, error } = await supabase
       .from('games')
-      .select('id, status, player1_id, player2_id')
+      .select('id, status, game_type, min_players, max_players')
       .eq('pin', pin.toUpperCase())
       .single();
 

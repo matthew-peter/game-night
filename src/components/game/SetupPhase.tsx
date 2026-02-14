@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, memo } from 'react';
-import { Game, CurrentTurn, SetupState } from '@/lib/supabase/types';
+import { Game, Seat, SetupState } from '@/lib/supabase/types';
 import { getCardTypeForPlayer } from '@/lib/game/keyGenerator';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,7 @@ interface SetupWordCardProps {
   word: string;
   index: number;
   game: Game;
-  playerRole: CurrentTurn;
+  mySeat: Seat;
   canSwap: boolean;
   isSwapping: boolean;
   onSwap: (index: number) => void;
@@ -24,15 +24,14 @@ const SetupWordCard = memo(function SetupWordCard({
   word,
   index,
   game,
-  playerRole,
+  mySeat,
   canSwap,
   isSwapping,
   onSwap,
   onLookup,
 }: SetupWordCardProps) {
-  const cardType = getCardTypeForPlayer(index, game.key_card, playerRole);
+  const cardType = getCardTypeForPlayer(index, game.key_card, mySeat);
 
-  // Dynamic font size based on word length
   const getFontSize = () => {
     if (word.length <= 5) return 'text-[11px]';
     if (word.length <= 7) return 'text-[10px]';
@@ -83,7 +82,6 @@ const SetupWordCard = memo(function SetupWordCard({
         </span>
       </button>
 
-      {/* Swap button overlay */}
       {canSwap && !isSwapping && (
         <button
           onClick={(e) => {
@@ -102,14 +100,14 @@ const SetupWordCard = memo(function SetupWordCard({
 
 interface SetupPhaseProps {
   game: Game;
-  playerRole: CurrentTurn;
+  mySeat: Seat;
   opponentName?: string;
   onGameUpdated: () => void;
 }
 
 export function SetupPhase({
   game,
-  playerRole,
+  mySeat,
   opponentName = 'Partner',
   onGameUpdated,
 }: SetupPhaseProps) {
@@ -119,21 +117,18 @@ export function SetupPhase({
 
   const setup = game.board_state.setup as SetupState;
 
-  const mySwapsUsed =
-    playerRole === 'player1'
-      ? setup.player1SwapsUsed
-      : setup.player2SwapsUsed;
-  const myReady =
-    playerRole === 'player1' ? setup.player1Ready : setup.player2Ready;
-  const partnerReady =
-    playerRole === 'player1' ? setup.player2Ready : setup.player1Ready;
+  const mySwapsUsed = setup.swapsUsed[mySeat] ?? 0;
+  const myReady = setup.ready[mySeat] ?? false;
+  // For 2-player, the other player's seat is the other index
+  const otherSeat = mySeat === 0 ? 1 : 0;
+  const partnerReady = setup.ready[otherSeat] ?? false;
   const swapsRemaining = setup.maxSwaps - mySwapsUsed;
 
   const canSwap = !myReady && swapsRemaining > 0;
 
   const handleSwap = useCallback(
     async (wordIndex: number) => {
-      if (swappingIndex !== null) return; // Prevent double-tap
+      if (swappingIndex !== null) return;
       setSwappingIndex(wordIndex);
 
       try {
@@ -232,7 +227,7 @@ export function SetupPhase({
                 word={word}
                 index={index}
                 game={game}
-                playerRole={playerRole}
+                mySeat={mySeat}
                 canSwap={canSwap}
                 isSwapping={swappingIndex === index}
                 onSwap={handleSwap}
@@ -242,7 +237,6 @@ export function SetupPhase({
           </div>
         </div>
 
-        {/* Explanation */}
         <div className="max-w-md mx-auto mt-4 px-3">
           <div className="bg-stone-800/60 rounded-lg p-3 text-xs text-stone-400 space-y-1">
             <p>
@@ -287,7 +281,6 @@ export function SetupPhase({
         </div>
       </div>
 
-      {/* Definition modal */}
       {lookupWord && (
         <WordDefinition
           word={lookupWord}

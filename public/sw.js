@@ -37,7 +37,7 @@ self.addEventListener('push', function(event) {
       if (visibleClient) {
         visibleClient.postMessage({
           type: 'in-app-notification',
-          title: data.title || 'Codenames Duet',
+          title: data.title || 'Game Night',
           body: data.body || "It's your turn!",
           gameId: gameId,
           url: data.url || '/'
@@ -58,11 +58,11 @@ self.addEventListener('push', function(event) {
         actions: [
           { action: 'open', title: 'Open Game' }
         ],
-        tag: gameId || 'codenames-turn',
+        tag: gameId || 'game-night-turn',
         renotify: true
       };
 
-      return self.registration.showNotification(data.title || 'Codenames Duet', options);
+      return self.registration.showNotification(data.title || 'Game Night', options);
     })
   );
 });

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useGameStore } from '@/lib/store/gameStore';
-import { Game, CurrentTurn } from '@/lib/supabase/types';
+import { Game, Seat } from '@/lib/supabase/types';
 import { validateClue } from '@/lib/game/clueValidator';
 import { getUnrevealedWords } from '@/lib/game/gameLogic';
 import { Button } from '@/components/ui/button';
@@ -12,49 +12,47 @@ import { broadcastTypingClue } from './PresenceIndicator';
 
 interface ClueInputProps {
   game: Game;
-  playerRole: CurrentTurn;
+  mySeat: Seat;
   onGiveClue: (clue: string, intendedWordIndices: number[]) => void;
   hasActiveClue?: boolean;
 }
 
-export function ClueInput({ game, playerRole, onGiveClue, hasActiveClue = false }: ClueInputProps) {
+export function ClueInput({ game, mySeat, onGiveClue, hasActiveClue = false }: ClueInputProps) {
   const [clue, setClue] = useState('');
   const [error, setError] = useState<string | null>(null);
   const { selectedWordsForClue, clearSelectedWords } = useGameStore();
-  
-  const isMyTurn = game.current_turn === playerRole;
+
+  const isMyTurn = game.current_turn === mySeat;
   const isCluePhase = game.current_phase === 'clue';
   const isGivingClue = isMyTurn && isCluePhase && game.status === 'playing';
-  
+
   if (!isGivingClue) return null;
-  
+
   const unrevealedWords = getUnrevealedWords(game.words, game.board_state);
-  
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    
+
     const trimmedClue = clue.trim().toUpperCase();
-    
-    // Validate clue
+
     const validation = validateClue(trimmedClue, unrevealedWords, game.clue_strictness);
     if (!validation.valid) {
       setError(validation.reason || 'Invalid clue');
       return;
     }
-    
-    // Convert selected words to indices
-    const intendedWordIndices = Array.from(selectedWordsForClue).map(word => 
+
+    const intendedWordIndices = Array.from(selectedWordsForClue).map(word =>
       game.words.indexOf(word)
     ).filter(idx => idx !== -1);
-    
+
     onGiveClue(trimmedClue, intendedWordIndices);
     setClue('');
     clearSelectedWords();
   };
-  
+
   const selectedCount = selectedWordsForClue.size;
-  
+
   return (
     <div className="bg-stone-800/80 rounded-lg px-3 py-3">
       <div className="max-w-lg mx-auto">
@@ -84,7 +82,7 @@ export function ClueInput({ game, playerRole, onGiveClue, hasActiveClue = false 
             </button>
           )}
         </div>
-        
+
         <form onSubmit={handleSubmit} className="flex gap-2">
           <Input
             value={clue}
@@ -112,7 +110,7 @@ export function ClueInput({ game, playerRole, onGiveClue, hasActiveClue = false 
             Give Clue ({selectedCount})
           </Button>
         </form>
-        
+
         {error && <p className="text-xs text-red-400 mt-1">{error}</p>}
       </div>
     </div>

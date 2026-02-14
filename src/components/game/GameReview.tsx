@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Game, Move, CurrentTurn } from '@/lib/supabase/types';
+import { Game, Move, Seat } from '@/lib/supabase/types';
 import { countAgentsFound, countTotalAgentsNeeded, checkAssassinHit } from '@/lib/game/gameLogic';
 import { getCardTypeForPlayer } from '@/lib/game/keyGenerator';
 import { Button } from '@/components/ui/button';
@@ -12,54 +12,50 @@ import Link from 'next/link';
 interface GameReviewProps {
   game: Game;
   moves: Move[];
-  playerRole: CurrentTurn;
-  player1Name: string;
-  player2Name: string;
+  mySeat: Seat;
+  /** Array of display names indexed by seat, e.g. ["Alice", "Bob"] */
+  seatNames: string[];
 }
 
-export function GameReview({ game, moves, playerRole, player1Name, player2Name }: GameReviewProps) {
+export function GameReview({ game, moves, mySeat, seatNames }: GameReviewProps) {
   const [showBoard, setShowBoard] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  
+
   const words = game.words;
   const agentsFound = countAgentsFound(game.board_state);
   const totalAgents = countTotalAgentsNeeded(game.key_card);
   const assassinHit = checkAssassinHit(game.board_state);
   const won = game.result === 'win';
-  
-  // Calculate stats
+
   const totalGuesses = moves.filter(m => m.move_type === 'guess').length;
   const correctGuesses = moves.filter(m => m.move_type === 'guess' && m.guess_result === 'agent').length;
   const totalClues = moves.filter(m => m.move_type === 'clue').length;
   const accuracy = totalGuesses > 0 ? Math.round((correctGuesses / totalGuesses) * 100) : 0;
-  
+
   return (
     <div className={cn(
       'min-h-dvh flex flex-col pb-[env(safe-area-inset-bottom)]',
       won ? 'bg-gradient-to-b from-emerald-900 to-emerald-950' : 'bg-gradient-to-b from-red-900 to-stone-950'
     )}>
-      {/* Hero section - fills screen */}
+      {/* Hero section */}
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
-        {/* Result emoji */}
         <div className="text-7xl mb-4">
           {won ? '🎉' : (assassinHit ? '💀' : '⏱️')}
         </div>
-        
-        {/* Result text */}
+
         <h1 className={cn(
           'text-4xl font-black uppercase tracking-tight mb-2',
           won ? 'text-emerald-300' : 'text-red-300'
         )}>
           {won ? 'Victory!' : 'Game Over'}
         </h1>
-        
+
         <p className="text-white/70 text-lg mb-8">
           {won && 'You found all the agents!'}
           {assassinHit && 'An assassin was revealed'}
           {!won && !assassinHit && 'Ran out of time'}
         </p>
-        
-        {/* Quick stats */}
+
         <div className="grid grid-cols-3 gap-6 mb-8 text-center">
           <div>
             <p className="text-3xl font-black text-white">{agentsFound}<span className="text-white/50 text-lg">/{totalAgents}</span></p>
@@ -74,30 +70,28 @@ export function GameReview({ game, moves, playerRole, player1Name, player2Name }
             <p className="text-xs text-white/50 uppercase tracking-wide">Accuracy</p>
           </div>
         </div>
-        
-        {/* Primary action */}
+
         <Link href="/dashboard" className="w-full max-w-xs mb-4">
           <Button className={cn(
             'w-full h-14 text-lg font-bold rounded-xl shadow-lg',
-            won 
-              ? 'bg-emerald-500 hover:bg-emerald-400 text-emerald-950' 
+            won
+              ? 'bg-emerald-500 hover:bg-emerald-400 text-emerald-950'
               : 'bg-white hover:bg-stone-100 text-stone-900'
           )}>
             Back to Dashboard
           </Button>
         </Link>
-        
-        {/* Secondary actions */}
+
         <div className="flex gap-3">
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             className="text-white/60 hover:text-white hover:bg-white/10"
             onClick={() => setShowBoard(!showBoard)}
           >
             {showBoard ? 'Hide Board' : 'View Board'}
           </Button>
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             className="text-white/60 hover:text-white hover:bg-white/10"
             onClick={() => setShowHistory(!showHistory)}
           >
@@ -105,49 +99,39 @@ export function GameReview({ game, moves, playerRole, player1Name, player2Name }
           </Button>
         </div>
       </div>
-      
-      {/* Expandable sections */}
+
+      {/* Board view */}
       {showBoard && (
         <div className="bg-black/30 px-4 py-6">
           <h3 className="text-white/70 text-sm font-semibold uppercase tracking-wide mb-3 text-center">Final Board</h3>
           <div className="grid grid-cols-5 gap-1 max-w-sm mx-auto">
             {game.words.map((word, index) => {
-              const p1Type = getCardTypeForPlayer(index, game.key_card, 'player1');
-              const p2Type = getCardTypeForPlayer(index, game.key_card, 'player2');
+              const types = game.key_card.map((_, seat) => getCardTypeForPlayer(index, game.key_card, seat));
               const revealed = game.board_state.revealed[word];
-              
-              // Determine display color based on both keys
-              // Priority: shared agent > shared assassin > assassin+agent (split) > single agent > single assassin > bystander
+
+              const isAgent = types.map(t => t === 'agent');
+              const isAssassin = types.map(t => t === 'assassin');
+
               let bgColor = 'bg-amber-100';
               let textColor = 'text-stone-700';
-              
-              const isAgent1 = p1Type === 'agent';
-              const isAgent2 = p2Type === 'agent';
-              const isAssassin1 = p1Type === 'assassin';
-              const isAssassin2 = p2Type === 'assassin';
-              
-              if (isAgent1 && isAgent2) {
-                // Shared agent (green on both sides)
+
+              if (isAgent.every(Boolean)) {
                 bgColor = 'bg-emerald-500';
                 textColor = 'text-white';
-              } else if (isAssassin1 && isAssassin2) {
-                // Shared assassin (black on both sides)
+              } else if (isAssassin.every(Boolean)) {
                 bgColor = 'bg-stone-900';
                 textColor = 'text-white';
-              } else if ((isAgent1 && isAssassin2) || (isAssassin1 && isAgent2)) {
-                // Agent on one side, assassin on the other — show split styling
+              } else if (isAgent.some(Boolean) && isAssassin.some(Boolean)) {
                 bgColor = 'bg-gradient-to-br from-emerald-500 to-stone-800';
                 textColor = 'text-white';
-              } else if (isAgent1 || isAgent2) {
-                // Agent on one side only
+              } else if (isAgent.some(Boolean)) {
                 bgColor = 'bg-emerald-300';
                 textColor = 'text-emerald-900';
-              } else if (isAssassin1 || isAssassin2) {
-                // Assassin on one side only
+              } else if (isAssassin.some(Boolean)) {
                 bgColor = 'bg-stone-700';
                 textColor = 'text-white';
               }
-              
+
               return (
                 <div
                   key={`${word}-${index}`}
@@ -163,8 +147,7 @@ export function GameReview({ game, moves, playerRole, player1Name, player2Name }
               );
             })}
           </div>
-          
-          {/* Legend */}
+
           <div className="mt-3 flex flex-wrap gap-3 justify-center text-[10px] text-white/60">
             <span className="flex items-center gap-1"><span className="w-2 h-2 bg-emerald-500 rounded-sm"/> Shared Agent</span>
             <span className="flex items-center gap-1"><span className="w-2 h-2 bg-emerald-300 rounded-sm"/> Agent</span>
@@ -174,7 +157,8 @@ export function GameReview({ game, moves, playerRole, player1Name, player2Name }
           </div>
         </div>
       )}
-      
+
+      {/* History */}
       {showHistory && (
         <div className="bg-black/30 px-4 py-6 max-h-[50vh] overflow-y-auto">
           <h3 className="text-white/70 text-sm font-semibold uppercase tracking-wide mb-3 text-center">Move History</h3>

@@ -1,6 +1,6 @@
 'use client';
 
-import { Move, CurrentTurn } from '@/lib/supabase/types';
+import { Move, Seat } from '@/lib/supabase/types';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
@@ -10,19 +10,17 @@ import { TappableClueWord } from './TappableClueWord';
 
 interface ClueHistoryProps {
   moves: Move[];
-  playerRole: CurrentTurn;
-  player1Name: string;
-  player2Name: string;
-  player1Id: string;
-  player2Id: string;
+  mySeat: Seat;
+  myUserId: string;
+  /** Map of player_id → display name */
+  playerNameMap: Map<string, string>;
   words: string[];
 }
 
-export function ClueHistory({ moves, playerRole, player1Name, player2Name, player1Id, player2Id, words }: ClueHistoryProps) {
-  // Group moves by clue
+export function ClueHistory({ moves, mySeat, myUserId, playerNameMap, words }: ClueHistoryProps) {
   const groupedMoves: { clue: Move; guesses: Move[] }[] = [];
   let currentGroup: { clue: Move; guesses: Move[] } | null = null;
-  
+
   for (const move of moves) {
     if (move.move_type === 'clue') {
       if (currentGroup) {
@@ -33,27 +31,20 @@ export function ClueHistory({ moves, playerRole, player1Name, player2Name, playe
       currentGroup.guesses.push(move);
     }
   }
-  
+
   if (currentGroup) {
     groupedMoves.push(currentGroup);
   }
-  
+
   const getWordFromIndex = (index: number | null) => {
     if (index === null || index < 0 || index >= words.length) return '?';
     return words[index];
   };
 
   const getPlayerName = (playerId: string) => {
-    if (playerId === player1Id) return player1Name;
-    if (playerId === player2Id) return player2Name;
-    return 'Unknown';
+    return playerNameMap.get(playerId) ?? 'Unknown';
   };
 
-  const isCurrentUser = (playerId: string) => {
-    return (playerRole === 'player1' && playerId === player1Id) ||
-           (playerRole === 'player2' && playerId === player2Id);
-  };
-  
   return (
     <Sheet>
       <SheetTrigger asChild>
@@ -74,54 +65,48 @@ export function ClueHistory({ moves, playerRole, player1Name, player2Name, playe
           ) : (
             <div className="space-y-4">
               {groupedMoves.map((group, idx) => {
-                const clueGiverName = getPlayerName(group.clue.player_id);
-                const isYourClue = isCurrentUser(group.clue.player_id);
-                
+                const isYourClue = group.clue.player_id === myUserId;
+                const clueGiverName = isYourClue ? 'You' : getPlayerName(group.clue.player_id);
+
                 return (
                   <div
                     key={group.clue.id}
                     className={cn(
                       "p-3 rounded-lg border",
-                      isYourClue 
-                        ? "bg-emerald-50 border-emerald-200" 
+                      isYourClue
+                        ? "bg-emerald-50 border-emerald-200"
                         : "bg-blue-50 border-blue-200"
                     )}
                   >
-                    {/* Clue header */}
                     <div className="flex items-center justify-between mb-2">
                       <span className={cn(
                         "text-xs font-medium flex items-center gap-1",
                         isYourClue ? "text-emerald-600" : "text-blue-600"
                       )}>
                         <User className="h-3 w-3" />
-                        {isYourClue ? 'You' : clueGiverName} gave clue
+                        {clueGiverName} gave clue
                       </span>
                       <span className="text-xs text-stone-400">
                         Turn #{idx + 1}
                       </span>
                     </div>
-                    
-                    {/* Clue word */}
+
                     <div className="font-bold text-lg text-stone-800">
                       <TappableClueWord word={group.clue.clue_word?.toUpperCase() || ''} />: {group.clue.clue_number}
                     </div>
-                    
-                    {/* Intended words - only show for your clues */}
+
                     {isYourClue && group.clue.intended_words && group.clue.intended_words.length > 0 && (
                       <div className="mt-1">
                         <span className="text-xs text-stone-500">You meant: </span>
                         <span className="text-xs font-medium text-stone-700">
-                          {group.clue.intended_words.map(idx => getWordFromIndex(idx)).join(', ')}
+                          {group.clue.intended_words.map(i => getWordFromIndex(i)).join(', ')}
                         </span>
                       </div>
                     )}
-                    
-                    {/* Guesses */}
+
                     {group.guesses.length > 0 && (
                       <div className="mt-2 pt-2 border-t border-stone-200">
-                        <p className="text-xs text-stone-500 mb-1">
-                          {isYourClue ? `${player2Name === clueGiverName ? player1Name : player2Name} guessed:` : 'You guessed:'}
-                        </p>
+                        <p className="text-xs text-stone-500 mb-1">Guesses:</p>
                         <div className="flex flex-wrap gap-1">
                           {group.guesses.map((guess) => (
                             <span

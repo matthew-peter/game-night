@@ -1,8 +1,9 @@
-import { KeyCard, KeyCardSide } from '@/lib/supabase/types';
+import { KeyCard, KeyCardSide, CardType, Seat } from '@/lib/supabase/types';
 
 /**
- * Generates a dual-sided key card for Codenames Duet
- * 
+ * Generates a dual-sided key card for Codenames Duet.
+ * Returns an array of two KeyCardSides indexed by seat.
+ *
  * Rules:
  * - Each side has 9 agents and 3 assassins
  * - 3 agents overlap (green on both sides)
@@ -11,64 +12,60 @@ import { KeyCard, KeyCardSide } from '@/lib/supabase/types';
  * - 1 assassin on each side is a bystander on the other side
  */
 export function generateKeyCard(): KeyCard {
-  // Shuffle indices 0-24
   const indices = Array.from({ length: 25 }, (_, i) => i);
   shuffleArray(indices);
-  
+
   let currentIndex = 0;
-  
+
   // 3 shared agents (green on both sides)
   const sharedAgents = indices.slice(currentIndex, currentIndex + 3);
   currentIndex += 3;
-  
+
   // 1 shared assassin (black on both sides)
   const sharedAssassin = indices.slice(currentIndex, currentIndex + 1);
   currentIndex += 1;
-  
-  // Player 1's exclusive agents (6 more to total 9)
-  const player1ExclusiveAgents = indices.slice(currentIndex, currentIndex + 6);
+
+  // Seat 0's exclusive agents (6 more to total 9)
+  const seat0ExclusiveAgents = indices.slice(currentIndex, currentIndex + 6);
   currentIndex += 6;
-  
-  // Player 2's exclusive agents (6 more to total 9)
-  const player2ExclusiveAgents = indices.slice(currentIndex, currentIndex + 6);
+
+  // Seat 1's exclusive agents (6 more to total 9)
+  const seat1ExclusiveAgents = indices.slice(currentIndex, currentIndex + 6);
   currentIndex += 6;
-  
-  // Player 1's assassin that is an agent for Player 2
-  // We take one from player2's exclusive agents
-  const player1AssassinThatIsPlayer2Agent = player2ExclusiveAgents[0];
-  
-  // Player 2's assassin that is an agent for Player 1
-  // We take one from player1's exclusive agents
-  const player2AssassinThatIsPlayer1Agent = player1ExclusiveAgents[0];
-  
-  // Player 1's assassin that is bystander for Player 2
-  const player1AssassinBystander = indices[currentIndex];
+
+  // Seat 0's assassin that is an agent for Seat 1
+  const seat0AssassinThatIsSeat1Agent = seat1ExclusiveAgents[0];
+
+  // Seat 1's assassin that is an agent for Seat 0
+  const seat1AssassinThatIsSeat0Agent = seat0ExclusiveAgents[0];
+
+  // Seat 0's assassin that is bystander for Seat 1
+  const seat0AssassinBystander = indices[currentIndex];
   currentIndex += 1;
-  
-  // Player 2's assassin that is bystander for Player 1
-  const player2AssassinBystander = indices[currentIndex];
+
+  // Seat 1's assassin that is bystander for Seat 0
+  const seat1AssassinBystander = indices[currentIndex];
   currentIndex += 1;
-  
-  // Build the key cards
-  const player1: KeyCardSide = {
-    agents: [...sharedAgents, ...player1ExclusiveAgents],
+
+  const side0: KeyCardSide = {
+    agents: [...sharedAgents, ...seat0ExclusiveAgents],
     assassins: [
       sharedAssassin[0],
-      player1AssassinThatIsPlayer2Agent,
-      player1AssassinBystander
-    ]
+      seat0AssassinThatIsSeat1Agent,
+      seat0AssassinBystander,
+    ],
   };
-  
-  const player2: KeyCardSide = {
-    agents: [...sharedAgents, ...player2ExclusiveAgents],
+
+  const side1: KeyCardSide = {
+    agents: [...sharedAgents, ...seat1ExclusiveAgents],
     assassins: [
       sharedAssassin[0],
-      player2AssassinThatIsPlayer1Agent,
-      player2AssassinBystander
-    ]
+      seat1AssassinThatIsSeat0Agent,
+      seat1AssassinBystander,
+    ],
   };
-  
-  return { player1, player2 };
+
+  return [side0, side1];
 }
 
 /**
@@ -82,28 +79,25 @@ function shuffleArray<T>(array: T[]): void {
 }
 
 /**
- * Get what a card looks like from a player's perspective
+ * Get what a card looks like from a specific seat's perspective.
  */
 export function getCardTypeForPlayer(
   wordIndex: number,
   keyCard: KeyCard,
-  player: 'player1' | 'player2'
-): 'agent' | 'assassin' | 'bystander' {
-  const side = keyCard[player];
-  
-  if (side.agents.includes(wordIndex)) {
-    return 'agent';
-  }
-  if (side.assassins.includes(wordIndex)) {
-    return 'assassin';
-  }
+  seat: Seat
+): CardType {
+  const side = keyCard[seat];
+  if (!side) return 'bystander';
+
+  if (side.agents.includes(wordIndex)) return 'agent';
+  if (side.assassins.includes(wordIndex)) return 'assassin';
   return 'bystander';
 }
 
 /**
- * Count total unique agents (should be 15 for Codenames Duet)
+ * Count total unique agents across all sides (should be 15 for Codenames Duet)
  */
 export function countTotalAgents(keyCard: KeyCard): number {
-  const allAgents = new Set([...keyCard.player1.agents, ...keyCard.player2.agents]);
+  const allAgents = new Set(keyCard.flatMap((side) => side.agents));
   return allAgents.size;
 }

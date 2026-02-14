@@ -2,9 +2,8 @@
 
 import { useState, useCallback, useRef, memo, useEffect } from 'react';
 import { useGameStore } from '@/lib/store/gameStore';
-import { Game, CurrentTurn, CardType } from '@/lib/supabase/types';
+import { Game, Seat, CardType } from '@/lib/supabase/types';
 import { getCardTypeForPlayer } from '@/lib/game/keyGenerator';
-import { isWordRevealed } from '@/lib/game/gameLogic';
 import { cn } from '@/lib/utils';
 import { WordDefinition } from './WordDefinition';
 import { broadcastSelectingWords } from './PresenceIndicator';
@@ -13,7 +12,7 @@ interface WordCardProps {
   word: string;
   index: number;
   game: Game;
-  playerRole: CurrentTurn;
+  mySeat: Seat;
   isGivingClue: boolean;
   isGuessing: boolean;
   isSelected: boolean;
@@ -28,7 +27,7 @@ const WordCard = memo(function WordCard({
   word,
   index,
   game,
-  playerRole,
+  mySeat,
   isGivingClue,
   isGuessing,
   isSelected,
@@ -43,41 +42,31 @@ const WordCard = memo(function WordCard({
   const isLongPress = useRef(false);
   const touchStartPos = useRef<{ x: number; y: number } | null>(null);
   const handledByTouch = useRef(false);
-  
+
   const revealed = game.board_state.revealed[word];
   const isRevealed = !!revealed;
-  
-  // Get card type from BOTH player perspectives
-  const cardTypeForMe = getCardTypeForPlayer(index, game.key_card, playerRole);
-  const otherPlayer = playerRole === 'player1' ? 'player2' : 'player1';
-  const cardTypeForThem = getCardTypeForPlayer(index, game.key_card, otherPlayer);
-  
-  // Has this card already been found as an agent?
+
+  // Get card type from MY perspective and the other seat's perspective
+  const cardTypeForMe = getCardTypeForPlayer(index, game.key_card, mySeat);
+  const otherSeat = mySeat === 0 ? 1 : 0; // For 2-player Codenames
+  const cardTypeForThem = getCardTypeForPlayer(index, game.key_card, otherSeat);
+
   const alreadyFoundAsAgent = isRevealed && revealed.type === 'agent';
-  
-  // You can guess any card that hasn't been found as an agent yet
   const canStillBeGuessed = !alreadyFoundAsAgent;
-  
-  // Is this card still an agent on MY key that my partner needs to find?
   const isStillMyAgent = !alreadyFoundAsAgent && cardTypeForMe === 'agent';
-  
-  // Dynamic font size based on word length
+
   const getFontSize = () => {
     if (word.length <= 5) return 'text-[11px]';
     if (word.length <= 7) return 'text-[10px]';
     if (word.length <= 9) return 'text-[9px]';
     return 'text-[8px]';
   };
-  
-  // Who guessed this card?
-  const guessedByMe = revealed?.guessedBy === playerRole;
-  const guessedByThem = revealed?.guessedBy && revealed?.guessedBy !== playerRole;
-  
-  // Card styling based on state
+
+  const guessedByMe = revealed?.guessedBy === mySeat;
+
   const getCardStyles = () => {
     if (isRevealed) {
       if (revealed.type === 'agent') {
-        // Found agent - solid green
         return {
           card: 'bg-emerald-600 border-emerald-700',
           text: 'text-white',
@@ -85,7 +74,6 @@ const WordCard = memo(function WordCard({
           indicatorColor: 'bg-emerald-800 text-emerald-100',
         };
       } else if (revealed.type === 'assassin') {
-        // RED for assassin
         return {
           card: 'bg-red-700 border-red-900',
           text: 'text-white',
@@ -93,59 +81,50 @@ const WordCard = memo(function WordCard({
           indicatorColor: 'bg-red-900 text-white',
         };
       } else {
-        // Bystander - show who guessed it
-        // Green border if it's still MY agent (partner needs to find it)
         const showGreenBorder = isStillMyAgent;
-        
         return {
-          card: showGreenBorder 
-            ? 'bg-amber-200 border-emerald-500 border-2' // amber bg + green border = bystander that's still your agent
+          card: showGreenBorder
+            ? 'bg-amber-200 border-emerald-500 border-2'
             : 'bg-amber-200 border-amber-400',
           text: 'text-amber-900',
           indicator: guessedByMe ? '○ YOU' : '○ THEM',
-          indicatorColor: showGreenBorder 
-            ? 'bg-emerald-600 text-white' // green indicator to emphasize it's still an agent
+          indicatorColor: showGreenBorder
+            ? 'bg-emerald-600 text-white'
             : 'bg-amber-300 text-amber-800',
         };
       }
     }
-    
-    // Unrevealed cards - show hints for clue giver
+
     if (cardTypeForMe === 'agent') {
       return {
         card: 'bg-emerald-50 border-emerald-400 border-2',
         text: 'text-emerald-900',
       };
     } else if (cardTypeForMe === 'assassin') {
-      // Show assassins clearly to clue giver
       return {
         card: 'bg-stone-700 border-stone-900 border-2',
         text: 'text-stone-100',
       };
     } else {
-      // Cream for bystanders
       return {
         card: 'bg-amber-50 border-amber-200 border',
         text: 'text-stone-700',
       };
     }
   };
-  
+
   const styles = getCardStyles();
-  
-  // Selection state for clue giving - allow for unrevealed OR isStillMyAgent
+
   const selectionStyles = isSelected && (!isRevealed || isStillMyAgent)
-    ? 'ring-4 ring-blue-500 ring-offset-2 scale-105' 
+    ? 'ring-4 ring-blue-500 ring-offset-2 scale-105'
     : '';
-  
-  // Highlight state for guessing (first tap)
+
   const canBeGuessed = canStillBeGuessed;
   const highlightStyles = isHighlightedForGuess && canBeGuessed
     ? 'ring-4 ring-amber-400 ring-offset-2 scale-105'
     : '';
-  
+
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    // Don't prevent default - allow scrolling
     isLongPress.current = false;
     touchStartPos.current = {
       x: e.touches[0].clientX,
@@ -154,11 +133,10 @@ const WordCard = memo(function WordCard({
     longPressTimer.current = setTimeout(() => {
       isLongPress.current = true;
       setShowDefinition(true);
-    }, 1000); // 1 second long press for dictionary
+    }, 1000);
   }, []);
-  
+
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    // If finger moves more than 15px, cancel the long press and selection
     if (touchStartPos.current) {
       const dx = Math.abs(e.touches[0].clientX - touchStartPos.current.x);
       const dy = Math.abs(e.touches[0].clientY - touchStartPos.current.y);
@@ -167,40 +145,30 @@ const WordCard = memo(function WordCard({
           clearTimeout(longPressTimer.current);
           longPressTimer.current = null;
         }
-        touchStartPos.current = null; // Mark as cancelled scroll
+        touchStartPos.current = null;
       }
     }
   }, []);
-  
+
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
     }
-    
-    // If touchStartPos is null, user was scrolling - don't select
-    if (!touchStartPos.current) {
-      return;
-    }
+
+    if (!touchStartPos.current) return;
     touchStartPos.current = null;
-    
-    // If long press triggered definition, don't do anything else
-    if (isLongPress.current) {
-      return;
-    }
-    
-    // Mark that we handled this via touch (prevent click from also firing)
+
+    if (isLongPress.current) return;
+
     handledByTouch.current = true;
-    
-    // Prevent default to ensure immediate response
     e.preventDefault();
-    
-    // Blur any focused input to dismiss keyboard
+
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
     }
-    
+
     const canClue = !isRevealed || isStillMyAgent;
-    
+
     if (isGivingClue && canClue) {
       onToggleSelect(word);
     } else if (isGuessing && canStillBeGuessed) {
@@ -211,21 +179,19 @@ const WordCard = memo(function WordCard({
       }
     }
   }, [isGivingClue, isGuessing, isRevealed, isStillMyAgent, canStillBeGuessed, isHighlightedForGuess, word, index, onToggleSelect, onHighlightForGuess, onConfirmGuess]);
-  
+
   const handleClick = useCallback(() => {
-    // If touch already handled this, skip
     if (handledByTouch.current) {
       handledByTouch.current = false;
       return;
     }
-    
-    // Blur any focused input to dismiss keyboard
+
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
     }
-    
+
     const canClue = !isRevealed || isStillMyAgent;
-    
+
     if (isGivingClue && canClue) {
       onToggleSelect(word);
     } else if (isGuessing && canStillBeGuessed) {
@@ -236,13 +202,12 @@ const WordCard = memo(function WordCard({
       }
     }
   }, [isGivingClue, isGuessing, isRevealed, isStillMyAgent, canStillBeGuessed, isHighlightedForGuess, word, index, onToggleSelect, onHighlightForGuess, onConfirmGuess]);
-  
+
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     setShowDefinition(true);
   }, []);
 
-  // Flip animation class
   const flipClass = flipAnimation === 'agent'
     ? 'animate-flip-agent'
     : flipAnimation === 'assassin'
@@ -265,50 +230,46 @@ const WordCard = memo(function WordCard({
             flipClass,
             ((!isRevealed || isStillMyAgent) && isGivingClue || canBeGuessed && isGuessing) && 'active:scale-95 cursor-pointer',
           )}
-        onClick={handleClick}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onContextMenu={handleContextMenu}
-        disabled={!canStillBeGuessed && !isStillMyAgent && !showDefinition}
-      >
-        {/* Word - dynamic sizing */}
-        <span className={cn(
-          'font-bold uppercase text-center leading-tight px-0.5',
-          getFontSize(),
-          styles.text
-        )}>
-          {word}
-        </span>
-        
-        {/* Who guessed indicator for revealed cards */}
-        {isRevealed && 'indicator' in styles && (
-          <div className={cn(
-            'absolute bottom-0 left-0 right-0 text-[7px] font-bold py-0.5 text-center',
-            styles.indicatorColor
+          onClick={handleClick}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onContextMenu={handleContextMenu}
+          disabled={!canStillBeGuessed && !isStillMyAgent && !showDefinition}
+        >
+          <span className={cn(
+            'font-bold uppercase text-center leading-tight px-0.5',
+            getFontSize(),
+            styles.text
           )}>
-            {styles.indicator}
-          </div>
-        )}
-        
-        {/* Selection checkmark for clue giving */}
-        {isSelected && !isRevealed && (
-          <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-blue-600 rounded-full flex items-center justify-center">
-            <span className="text-white text-[10px] font-bold">✓</span>
-          </div>
-        )}
-        
-        {/* Highlight for guess - tap again prompt at bottom, word stays visible */}
-        {isHighlightedForGuess && canBeGuessed && (
-          <div className="absolute bottom-0 left-0 right-0 bg-amber-500 py-0.5 rounded-b-lg">
-            <span className="text-[7px] font-bold text-amber-900 uppercase">
-              Tap to guess
-            </span>
-          </div>
-        )}
-      </button>
+            {word}
+          </span>
+
+          {isRevealed && 'indicator' in styles && (
+            <div className={cn(
+              'absolute bottom-0 left-0 right-0 text-[7px] font-bold py-0.5 text-center',
+              styles.indicatorColor
+            )}>
+              {styles.indicator}
+            </div>
+          )}
+
+          {isSelected && !isRevealed && (
+            <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-blue-600 rounded-full flex items-center justify-center">
+              <span className="text-white text-[10px] font-bold">✓</span>
+            </div>
+          )}
+
+          {isHighlightedForGuess && canBeGuessed && (
+            <div className="absolute bottom-0 left-0 right-0 bg-amber-500 py-0.5 rounded-b-lg">
+              <span className="text-[7px] font-bold text-amber-900 uppercase">
+                Tap to guess
+              </span>
+            </div>
+          )}
+        </button>
       </div>
-      
+
       {showDefinition && (
         <WordDefinition
           word={word}
@@ -321,81 +282,73 @@ const WordCard = memo(function WordCard({
 
 interface GameBoardProps {
   game: Game;
-  playerRole: CurrentTurn;
+  mySeat: Seat;
   onGuess: (wordIndex: number) => void;
   hasActiveClue?: boolean;
 }
 
-export function GameBoard({ game, playerRole, onGuess, hasActiveClue = false }: GameBoardProps) {
+export function GameBoard({ game, mySeat, onGuess, hasActiveClue = false }: GameBoardProps) {
   const { selectedWordsForClue, toggleWordForClue } = useGameStore();
   const [highlightedWordIndex, setHighlightedWordIndex] = useState<number | null>(null);
   const [flippingWords, setFlippingWords] = useState<Record<string, CardType>>({});
   const [boardShaking, setBoardShaking] = useState(false);
   const prevRevealedRef = useRef<Record<string, { type: CardType }>>(game.board_state.revealed);
-  
-  // Detect newly revealed cards and trigger flip animation
+
   useEffect(() => {
     const prevRevealed = prevRevealedRef.current;
     const currentRevealed = game.board_state.revealed;
-    
+
     const newlyRevealed: Record<string, CardType> = {};
     for (const word of Object.keys(currentRevealed)) {
       if (!prevRevealed[word]) {
         newlyRevealed[word] = currentRevealed[word].type;
       }
     }
-    
+
     if (Object.keys(newlyRevealed).length > 0) {
       setFlippingWords(newlyRevealed);
 
-      // If an assassin was just revealed, shake the board
       const hasAssassin = Object.values(newlyRevealed).includes('assassin');
       if (hasAssassin) {
         setBoardShaking(true);
       }
 
-      // Clear animation classes after the longest animation completes
-      // (assassin flip is 1.1s + glow is 1.4s)
       const timeout = setTimeout(() => {
         setFlippingWords({});
         setBoardShaking(false);
       }, 1600);
       return () => clearTimeout(timeout);
     }
-    
+
     prevRevealedRef.current = currentRevealed;
   }, [game.board_state.revealed]);
-  
-  // Keep the ref in sync even when no new reveals
+
   useEffect(() => {
     prevRevealedRef.current = game.board_state.revealed;
   });
 
-  // Wrap toggleWordForClue to also broadcast presence
   const handleToggleWordForClue = useCallback((word: string) => {
     toggleWordForClue(word);
     broadcastSelectingWords();
   }, [toggleWordForClue]);
-  
-  const isClueGiver = game.current_turn === playerRole;
-  const isGuesser = game.current_turn !== playerRole;
+
+  const isClueGiver = game.current_turn === mySeat;
+  const isGuesser = game.current_turn !== mySeat;
   const isCluePhase = game.current_phase === 'clue';
   const isGuessPhase = game.current_phase === 'guess';
-  
-  // Clue giver: I'm the clue giver and we're in clue phase
+
   const isGivingClue = isClueGiver && isCluePhase && game.status === 'playing';
-  // Guesser: I'm NOT the clue giver and we're in guess phase
   const isGuessing = isGuesser && isGuessPhase && game.status === 'playing';
-  
+
   const handleHighlightForGuess = useCallback((wordIndex: number) => {
     setHighlightedWordIndex(prev => prev === wordIndex ? null : wordIndex);
   }, []);
-  
+
   const handleConfirmGuess = useCallback((wordIndex: number) => {
     setHighlightedWordIndex(null);
     onGuess(wordIndex);
   }, [onGuess]);
-  
+
   return (
     <div className="w-full max-w-md mx-auto px-1">
       <div className={cn("grid grid-cols-5 gap-1", boardShaking && "animate-board-shake")}>
@@ -405,7 +358,7 @@ export function GameBoard({ game, playerRole, onGuess, hasActiveClue = false }: 
             word={word}
             index={index}
             game={game}
-            playerRole={playerRole}
+            mySeat={mySeat}
             isGivingClue={isGivingClue}
             isGuessing={isGuessing}
             isSelected={selectedWordsForClue.has(word)}

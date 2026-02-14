@@ -1,7 +1,7 @@
 'use client';
 
-import { Game, Move, CurrentTurn } from '@/lib/supabase/types';
-import { countAgentsFound, countTotalAgentsNeeded, getRemainingAgentsPerPlayer } from '@/lib/game/gameLogic';
+import { Game, Move, Seat } from '@/lib/supabase/types';
+import { countAgentsFound, countTotalAgentsNeeded, getRemainingAgentsPerSeat } from '@/lib/game/gameLogic';
 import { cn } from '@/lib/utils';
 import { TappableClueWord } from './TappableClueWord';
 import { Reactions } from './Reactions';
@@ -10,7 +10,7 @@ import { GameChat } from './GameChat';
 
 interface GameStatusProps {
   game: Game;
-  playerRole: CurrentTurn;
+  mySeat: Seat;
   opponentName?: string;
   opponentId?: string;
   currentClue?: Move | null;
@@ -19,35 +19,26 @@ interface GameStatusProps {
   userName?: string;
 }
 
-export function GameStatus({ game, playerRole, opponentName, opponentId, currentClue, guessCount = 0, userId, userName }: GameStatusProps) {
-  const isClueGiver = game.current_turn === playerRole;
+export function GameStatus({ game, mySeat, opponentName, opponentId, currentClue, guessCount = 0, userId, userName }: GameStatusProps) {
+  const isClueGiver = game.current_turn === mySeat;
   const isCluePhase = game.current_phase === 'clue';
   const isGuessPhase = game.current_phase === 'guess';
   const inSuddenDeath = game.timer_tokens <= 0 || game.sudden_death;
-  
+
   const agentsFound = countAgentsFound(game.board_state);
   const totalAgents = countTotalAgentsNeeded(game.key_card);
-  const remaining = getRemainingAgentsPerPlayer(game);
-  
-  // remaining.player1 = light green cards on player1's board = cards player2 needs to guess
-  // remaining.player2 = light green cards on player2's board = cards player1 needs to guess
-  // "They need to find" = light green on MY board
-  // "I need to find" = light green on THEIR board
-  const myRemaining = playerRole === 'player1' ? remaining.player2 : remaining.player1;
-  const theirRemaining = playerRole === 'player1' ? remaining.player1 : remaining.player2;
-  
-  // Simplified status logic:
-  // - My turn to give clue: I'm clue giver (current_turn) AND phase is clue
-  // - My turn to guess: I'm NOT clue giver AND phase is guess
-  // - Waiting for them to give clue: I'm NOT clue giver AND phase is clue
-  // - Waiting for them to guess: I'm clue giver AND phase is guess
-  // - Sudden death: only guessing allowed
-  
+  const remaining = getRemainingAgentsPerSeat(game);
+
+  // remaining[mySeat] = light green cards on MY board = cards my partner needs to guess
+  // remaining[otherSeat] = light green cards on THEIR board = cards I need to guess
+  const otherSeat = mySeat === 0 ? 1 : 0;
+  const theirRemaining = remaining[mySeat] ?? 0;     // cards on MY key that THEY need to find
+  const myRemaining = remaining[otherSeat] ?? 0;      // cards on THEIR key that I need to find
+
   let statusText = '';
   let isActive = false;
-  
+
   if (inSuddenDeath) {
-    // In sudden death, it's always guess phase
     if (isGuessPhase && !isClueGiver) {
       statusText = '💀 SUDDEN DEATH - GUESS!';
       isActive = true;
@@ -69,21 +60,19 @@ export function GameStatus({ game, playerRole, opponentName, opponentId, current
       statusText = `${opponentName || 'Partner'} giving clue...`;
     }
   }
-  
+
   return (
     <div className="bg-stone-700 px-3 py-2">
       <div className="max-w-md mx-auto space-y-2">
         {/* Row 1: Turn + Timer + Score */}
         <div className="flex items-center justify-between">
-          {/* Turn indicator */}
           <div className={cn(
             'px-3 py-1 rounded-full text-xs font-bold',
             isActive ? 'bg-emerald-600 text-white' : 'bg-stone-500 text-white'
           )}>
             {statusText}
           </div>
-          
-          {/* Timer + Score + Reactions compact */}
+
           <div className="flex items-center gap-3">
             <div className={cn(
               'flex items-center gap-1 text-xs font-bold',
@@ -114,7 +103,7 @@ export function GameStatus({ game, playerRole, opponentName, opponentId, current
             )}
           </div>
         </div>
-        
+
         {/* Row 2: Current clue OR remaining counts */}
         {currentClue ? (
           <div className="flex items-center justify-center gap-2 py-1 bg-stone-800 rounded">
@@ -130,7 +119,7 @@ export function GameStatus({ game, playerRole, opponentName, opponentId, current
             <span>{opponentName || 'They'}: <span className="text-emerald-400 font-bold">{theirRemaining}</span> to find</span>
           </div>
         )}
-        
+
         {/* Partner presence indicator */}
         {userId && game.status === 'playing' && (
           <PresenceIndicator

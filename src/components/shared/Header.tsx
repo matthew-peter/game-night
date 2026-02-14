@@ -20,8 +20,7 @@ export function Header() {
     <header className="bg-stone-800 text-white">
       <div className="max-w-4xl mx-auto px-3 py-1.5 flex items-center justify-between">
         <Link href="/dashboard" className="flex items-center gap-1.5">
-          <span className="text-sm font-bold">CODENAMES</span>
-          <span className="text-[10px] font-medium bg-emerald-600 px-1.5 py-0.5 rounded">DUET</span>
+          <span className="text-sm font-bold">GAME NIGHT</span>
         </Link>
 
         {user && (

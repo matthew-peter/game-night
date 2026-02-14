@@ -70,7 +70,7 @@ export function AuthForm() {
         </CardTitle>
         <CardDescription>
           {isSignUp
-            ? 'Sign up to start playing Codenames Duet'
+            ? 'Sign up to start playing'
             : 'Sign in to continue your games'}
         </CardDescription>
       </CardHeader>
