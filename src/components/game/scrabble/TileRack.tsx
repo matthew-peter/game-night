@@ -36,7 +36,7 @@ export function TileRack({
   };
 
   return (
-    <div className="flex items-center justify-center gap-1.5 py-2.5 px-4 bg-amber-900/60 rounded-xl border border-amber-800/40">
+    <div className="flex items-center justify-center gap-[6px] py-2 px-3">
       {tiles.map((tile, index) => {
         const isBlank = tile === '_';
         const isSelected = selectedIndices.has(index);
@@ -49,18 +49,18 @@ export function TileRack({
             isBlank={isBlank}
             isSelected={isSelected}
             isDragging={isDragging}
-            size="lg"
+            size="rack"
             onClick={disabled ? undefined : () => onTileClick(index)}
             onDragStart={disabled || mode === 'exchange' ? undefined : (e) => handleDragStart(index, e)}
             onDragEnd={handleDragEnd}
           />
         );
       })}
-      {/* Fill empty slots to maintain consistent rack width */}
+      {/* Empty slot placeholders */}
       {Array.from({ length: Math.max(0, RACK_SIZE - tiles.length) }).map((_, i) => (
         <div
           key={`empty-${i}`}
-          className="w-11 h-11 rounded-[3px] border-2 border-dashed border-amber-700/30"
+          className="w-[42px] h-[42px] sm:w-[46px] sm:h-[46px] rounded-[2px] border border-dashed border-stone-700/40"
         />
       ))}
     </div>

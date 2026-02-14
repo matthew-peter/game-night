@@ -32,16 +32,10 @@ self.addEventListener('push', function(event) {
         return;
       }
 
-      // Case 2: User has the app open on another page — send in-app toast.
-      // This avoids the jarring OS notification while they're actively using the app.
+      // Case 2: User has the app open on ANY page — suppress entirely.
+      // Realtime subscriptions handle all in-app updates. Push notifications
+      // are only useful when the app is fully closed/backgrounded.
       if (visibleClient) {
-        visibleClient.postMessage({
-          type: 'in-app-notification',
-          title: data.title || 'Game Night',
-          body: data.body || "It's your turn!",
-          gameId: gameId,
-          url: data.url || '/'
-        });
         return;
       }
 

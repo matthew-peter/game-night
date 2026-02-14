@@ -20,60 +20,76 @@ export function ScrabbleScoreboard({
   userId,
 }: ScrabbleScoreboardProps) {
   const tilesInBag = boardState.tileBag.length;
-  const scorelessWarning = boardState.consecutivePasses >= MAX_SCORELESS_TURNS - 2;
+  const scorelessWarning = boardState.consecutivePasses >= MAX_SCORELESS_TURNS - 2 && boardState.consecutivePasses > 0;
+  const lastPlay = boardState.lastPlay;
+
+  // Build last play text
+  let lastPlayText = '';
+  if (lastPlay) {
+    const p = players.find(pl => pl.seat === lastPlay.playerSeat);
+    const name = p?.user_id === userId ? 'You' : p?.user?.username ?? `P${lastPlay.playerSeat + 1}`;
+    if (lastPlay.type === 'pass') {
+      lastPlayText = `${name} passed`;
+    } else if (lastPlay.type === 'exchange') {
+      lastPlayText = `${name} swapped ${lastPlay.tilesExchanged} tile${lastPlay.tilesExchanged !== 1 ? 's' : ''}`;
+    } else if (lastPlay.type === 'place' && lastPlay.words?.length) {
+      const wordList = lastPlay.words.map(w => w.word).join(', ');
+      lastPlayText = `${name}: ${wordList} (+${lastPlay.totalScore})`;
+    }
+  }
 
   return (
-    <div className="px-3 py-2 bg-stone-800/90 border-b border-stone-700/50">
-      <div className="max-w-md mx-auto">
-        {/* Player scores row */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5 overflow-x-auto">
-            {players.map((player) => {
-              const isMe = player.user_id === userId;
-              const isCurrent = player.seat === currentTurn;
-              const score = boardState.scores[player.seat] ?? 0;
-              const name = isMe
-                ? 'You'
-                : player.user?.username ?? `P${player.seat + 1}`;
+    <div className="px-3 py-1.5 bg-stone-800/80">
+      {/* Scores row */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1 overflow-x-auto min-w-0">
+          {players.map((player) => {
+            const isMe = player.user_id === userId;
+            const isCurrent = player.seat === currentTurn;
+            const score = boardState.scores[player.seat] ?? 0;
+            const name = isMe ? 'You' : player.user?.username ?? `P${player.seat + 1}`;
 
-              return (
-                <div
-                  key={player.id}
-                  className={cn(
-                    'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-sm transition-all',
-                    isCurrent && 'bg-amber-600/30 ring-1 ring-amber-500/60',
-                    isMe ? 'text-white' : 'text-stone-300'
-                  )}
-                >
-                  {isCurrent && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
-                  )}
-                  <span className="font-medium truncate max-w-[72px]">{name}</span>
-                  <span className="font-bold text-amber-400 tabular-nums">{score}</span>
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="flex items-center gap-3 text-xs text-stone-400 shrink-0 ml-2">
-            <div className="flex items-center gap-1" title={`${tilesInBag} tiles remaining in the bag`}>
-              <span className="text-amber-500/70">bag</span>
-              <span className="font-semibold text-stone-300 tabular-nums">{tilesInBag}</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="text-amber-500/70">turn</span>
-              <span className="font-semibold text-stone-300 tabular-nums">{boardState.turnNumber}</span>
-            </div>
-          </div>
+            return (
+              <div
+                key={player.id}
+                className={cn(
+                  'flex items-center gap-1 px-2 py-0.5 rounded text-sm shrink-0',
+                  isCurrent && 'bg-amber-900/40',
+                )}
+              >
+                {isCurrent && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+                )}
+                <span className={cn(
+                  'font-medium truncate max-w-[64px]',
+                  isMe ? 'text-stone-100' : 'text-stone-400'
+                )}>
+                  {name}
+                </span>
+                <span className="font-bold text-amber-400 tabular-nums">{score}</span>
+              </div>
+            );
+          })}
         </div>
 
-        {/* Scoreless turns warning */}
-        {scorelessWarning && boardState.consecutivePasses > 0 && (
-          <div className="mt-1 text-[10px] text-amber-400/80 text-center">
-            {MAX_SCORELESS_TURNS - boardState.consecutivePasses} scoreless turn{MAX_SCORELESS_TURNS - boardState.consecutivePasses !== 1 ? 's' : ''} until game ends
-          </div>
-        )}
+        <div className="flex items-center gap-2 text-[11px] text-stone-500 shrink-0 ml-2 tabular-nums">
+          <span>{tilesInBag} left</span>
+        </div>
       </div>
+
+      {/* Last play + warnings (single line) */}
+      {(lastPlayText || scorelessWarning) && (
+        <div className="flex items-center justify-between mt-0.5 text-[11px]">
+          {lastPlayText && (
+            <span className="text-stone-500 truncate">{lastPlayText}</span>
+          )}
+          {scorelessWarning && (
+            <span className="text-amber-500/80 shrink-0 ml-auto">
+              {MAX_SCORELESS_TURNS - boardState.consecutivePasses} turns left
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
