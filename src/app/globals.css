@@ -149,14 +149,6 @@ body.game-page-active {
   overscroll-behavior: none;
 }
 
-/* Prevent iOS scroll-to-input behavior on focusable elements within the game */
-.game-viewport input,
-.game-viewport textarea,
-.game-viewport select {
-  /* Prevent browser from scrolling the page to show the input */
-  scroll-margin: 0;
-}
-
 /* Scrollable areas within the fixed game viewport */
 .game-scroll-area {
   -webkit-overflow-scrolling: touch;
@@ -308,4 +300,19 @@ body.game-page-active {
 
 .animate-chat-fade {
   animation: chat-fade-out 8s ease-out forwards;
+}
+
+/* Bottom sheet slide-up for chat panel */
+@keyframes chat-sheet-up {
+  0% {
+    transform: translateY(100%);
+    opacity: 0.5;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.animate-chat-sheet-up {
+  animation: chat-sheet-up 0.25s ease-out;
 }

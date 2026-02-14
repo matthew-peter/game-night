@@ -43,6 +43,7 @@ function GamePageContent({ gameId }: { gameId: string }) {
   const [completionSynced, setCompletionSynced] = useState(false);
   const [assassinAnimating, setAssassinAnimating] = useState(false);
   const isSubmittingGuess = useRef(false);
+  const gameViewportRef = useRef<HTMLDivElement>(null);
 
   // ── Lock body scroll for iOS PWA ───────────────────────────────────────
   // Prevents the pull-to-bounce / overscroll on iPhone home-screen apps.
@@ -52,6 +53,36 @@ function GamePageContent({ gameId }: { gameId: string }) {
     document.body.classList.add('game-page-active');
     return () => {
       document.body.classList.remove('game-page-active');
+    };
+  }, []);
+
+  // ── Visual viewport tracking (keyboard-aware layout) ──────────────────
+  // When the iOS keyboard appears, the visual viewport shrinks but the
+  // layout viewport stays the same.  Fixed elements still cover the full
+  // layout viewport — meaning they extend behind the keyboard.
+  //
+  // We resize the game container to match the visual viewport so the flex
+  // layout naturally adjusts: the main scroll area shrinks, the clue input
+  // stays visible, and nothing jumps.  This approach WORKS WITH the browser
+  // instead of fighting it (no more preventScroll hacks).
+  useEffect(() => {
+    const vv = window.visualViewport;
+    const el = gameViewportRef.current;
+    if (!vv || !el) return;
+
+    const update = () => {
+      el.style.height = `${vv.height}px`;
+      el.style.bottom = 'auto';
+    };
+
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+      el.style.height = '';
+      el.style.bottom = '';
     };
   }, []);
 
@@ -530,7 +561,7 @@ function GamePageContent({ gameId }: { gameId: string }) {
     : moves.filter(m => m.move_type === 'guess').length;
 
   return (
-    <div className="game-viewport fixed inset-0 bg-gradient-to-b from-stone-800 via-stone-700 to-stone-900 flex flex-col overflow-hidden">
+    <div ref={gameViewportRef} className="game-viewport fixed inset-0 bg-gradient-to-b from-stone-800 via-stone-700 to-stone-900 flex flex-col overflow-hidden">
       <Header />
       
       <GameStatus

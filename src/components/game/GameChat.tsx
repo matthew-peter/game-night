@@ -6,8 +6,13 @@ import { cn } from '@/lib/utils';
 import { MessageCircle, Send, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
-const MAX_MESSAGE_LENGTH = 60;
-/** How long the peek preview stays visible (ms) */
+/**
+ * Max message length.  120 chars is plenty for quick in-game chat
+ * without allowing walls of text that break the layout.
+ */
+const MAX_MESSAGE_LENGTH = 120;
+
+/** How long the peek preview bubble stays visible (ms) */
 const PEEK_DURATION = 4000;
 
 interface ChatMessage {
@@ -42,10 +47,7 @@ export function GameChat({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const [panelPos, setPanelPos] = useState<{
-    top: number;
-    right: number;
-  } | null>(null);
+  const chatPanelRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
   const isOpenRef = useRef(isOpen);
 
@@ -72,9 +74,7 @@ export function GameChat({
         .order('created_at', { ascending: true })
         .limit(100);
 
-      if (data) {
-        setMessages(data);
-      }
+      if (data) setMessages(data);
       setLoaded(true);
     };
 
@@ -119,10 +119,7 @@ export function GameChat({
 
   // ── Peek preview logic ─────────────────────────────────────────────────
   const showPeek = useCallback((text: string) => {
-    // Clear any existing peek timer
-    if (peekTimerRef.current) {
-      clearTimeout(peekTimerRef.current);
-    }
+    if (peekTimerRef.current) clearTimeout(peekTimerRef.current);
     setPeekMessage(text);
     peekTimerRef.current = setTimeout(() => {
       setPeekMessage(null);
@@ -157,19 +154,45 @@ export function GameChat({
 
   // Clear unread when opening chat
   useEffect(() => {
-    if (isOpen) {
-      setUnreadCount(0);
-      // Calculate panel position from button
-      if (buttonRef.current) {
-        const rect = buttonRef.current.getBoundingClientRect();
-        setPanelPos({
-          top: rect.bottom + 4,
-          right: window.innerWidth - rect.right,
-        });
-      }
-    }
+    if (isOpen) setUnreadCount(0);
   }, [isOpen]);
 
+  // ── Visual viewport tracking for keyboard ──────────────────────────
+  // The chat panel is portaled to document.body and positioned fixed at
+  // the bottom of the screen.  On iOS, the keyboard reduces the visual
+  // viewport but fixed elements stay at layout-viewport coordinates —
+  // meaning the input goes BEHIND the keyboard.
+  //
+  // We listen to visualViewport and push the panel up by the keyboard
+  // height, keeping the input always visible and accessible.
+  useEffect(() => {
+    if (!isOpen) return;
+    const vv = window.visualViewport;
+    const el = chatPanelRef.current;
+    if (!vv || !el) return;
+
+    const update = () => {
+      const offset = window.innerHeight - vv.height - vv.offsetTop;
+      el.style.bottom = `${Math.max(0, offset)}px`;
+      // Also constrain panel height so it doesn't extend above the
+      // visible area when the keyboard is open.
+      el.style.setProperty(
+        '--chat-max-h',
+        `${Math.min(400, vv.height * 0.65)}px`
+      );
+    };
+
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    update();
+
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+    };
+  }, [isOpen]);
+
+  // ── Send message ──────────────────────────────────────────────────────
   const sendMessage = useCallback(async () => {
     const text = message.trim();
     if (!text) return;
@@ -231,8 +254,6 @@ export function GameChat({
         // Notification failure is non-critical
       }
     }
-
-    inputRef.current?.focus({ preventScroll: true });
   }, [message, gameId, playerId, playerName, opponentId, supabase]);
 
   const handleKeyDown = useCallback(
@@ -250,7 +271,7 @@ export function GameChat({
 
   return (
     <>
-      {/* Chat toggle button */}
+      {/* ── Chat toggle button ──────────────────────────────────────────── */}
       <button
         ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
@@ -282,7 +303,6 @@ export function GameChat({
           <div
             className="fixed z-[98] pointer-events-none animate-chat-in"
             style={{
-              // Position near the chat button
               top: buttonRef.current
                 ? buttonRef.current.getBoundingClientRect().bottom + 6
                 : 80,
@@ -304,117 +324,129 @@ export function GameChat({
           document.body
         )}
 
-      {/* ── Chat panel ─────────────────────────────────────────────────── */}
+      {/* ── Bottom sheet chat panel ─────────────────────────────────────── */}
+      {/*
+        This is a full-width bottom sheet instead of a cramped dropdown.
+        Positioning it at the bottom:
+        - Puts the input near where the keyboard appears (natural on mobile)
+        - Gives more room for messages (up to 400px / 65% of visual viewport)
+        - The visualViewport effect pushes it above the keyboard when open
+      */}
       {isOpen &&
         mounted &&
-        panelPos &&
         createPortal(
           <>
-            {/* Backdrop to close */}
+            {/* Backdrop — semi-transparent so the game board is still visible */}
             <div
-              className="fixed inset-0 z-[99]"
+              className="fixed inset-0 z-[99] bg-black/30"
               onClick={() => setIsOpen(false)}
             />
+
+            {/* Panel wrapper — positioned fixed at bottom, adjusted by vv effect */}
             <div
-              className="fixed w-64 bg-stone-800 rounded-xl shadow-xl border border-stone-600 z-[100] animate-in slide-in-from-top-2 duration-150 flex flex-col max-h-[280px]"
-              style={{ top: panelPos.top, right: panelPos.right }}
+              ref={chatPanelRef}
+              className="fixed left-0 right-0 bottom-0 z-[100] animate-chat-sheet-up"
             >
-              {/* Header */}
-              <div className="px-3 py-2 border-b border-stone-700 flex items-center justify-between">
-                <span className="text-xs font-semibold text-white">Chat</span>
-                <button
-                  onClick={() => setIsOpen(false)}
-                  className="text-stone-400 hover:text-white transition-colors"
-                  aria-label="Close chat"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              {/* Messages */}
-              <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1.5 min-h-[80px] max-h-[180px]">
-                {!loaded && (
-                  <p className="text-[10px] text-stone-500 text-center py-4">
-                    Loading...
-                  </p>
-                )}
-                {loaded && messages.length === 0 && (
-                  <p className="text-[10px] text-stone-500 text-center py-4">
-                    No messages yet. Say hi!
-                  </p>
-                )}
-                {messages.map((msg) => {
-                  const isMe = msg.player_id === playerId;
-                  return (
-                    <div
-                      key={msg.id}
-                      className={cn(
-                        'animate-chat-in',
-                        isMe ? 'text-right' : 'text-left'
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          'inline-block px-2 py-1 rounded-lg text-xs max-w-[85%] break-words',
-                          isMe
-                            ? 'bg-blue-600 text-white rounded-br-sm'
-                            : 'bg-stone-700 text-stone-200 rounded-bl-sm'
-                        )}
-                      >
-                        {msg.text}
-                      </span>
-                      <div className="text-[9px] text-stone-500 mt-0.5">
-                        {getSenderName(msg.player_id)}
-                      </div>
-                    </div>
-                  );
-                })}
-                <div ref={messagesEndRef} />
-              </div>
-
-              {/* Input */}
-              <div className="px-2 py-2 border-t border-stone-700">
-                <div className="flex gap-1.5">
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    value={message}
-                    onChange={(e) =>
-                      setMessage(e.target.value.slice(0, MAX_MESSAGE_LENGTH))
-                    }
-                    onKeyDown={handleKeyDown}
-                    onFocus={(e) => {
-                      // Prevent iOS from scrolling the page when input is focused.
-                      e.preventDefault();
-                      e.target.focus({ preventScroll: true });
-                    }}
-                    placeholder="Type a message..."
-                    className="flex-1 bg-stone-700 text-white text-xs rounded-lg px-2.5 py-1.5
-                               placeholder:text-stone-400 outline-none focus:ring-1 focus:ring-blue-400
-                               border border-stone-600"
-                    style={{ fontSize: '16px' }}
-                    maxLength={MAX_MESSAGE_LENGTH}
-                    autoComplete="off"
-                    enterKeyHint="send"
-                  />
+              <div
+                className="mx-auto max-w-md bg-stone-800 rounded-t-2xl shadow-2xl border border-stone-600 border-b-0 flex flex-col"
+                style={{
+                  maxHeight: 'var(--chat-max-h, min(400px, 55vh))',
+                }}
+              >
+                {/* Header */}
+                <div className="px-4 py-3 border-b border-stone-700 flex items-center justify-between shrink-0">
+                  <span className="text-sm font-semibold text-white">
+                    Chat with {opponentName}
+                  </span>
                   <button
-                    onClick={sendMessage}
-                    disabled={!message.trim()}
-                    className={cn(
-                      'w-7 h-7 rounded-lg flex items-center justify-center transition-all',
-                      message.trim()
-                        ? 'bg-blue-600 hover:bg-blue-500 text-white active:scale-95'
-                        : 'bg-stone-700 text-stone-500 cursor-not-allowed'
-                    )}
+                    onClick={() => setIsOpen(false)}
+                    className="w-7 h-7 rounded-full bg-stone-700 hover:bg-stone-600 flex items-center justify-center transition-colors"
+                    aria-label="Close chat"
                   >
-                    <Send className="w-3.5 h-3.5" />
+                    <X className="w-4 h-4 text-stone-300" />
                   </button>
                 </div>
-                {message.length > MAX_MESSAGE_LENGTH - 15 && (
-                  <span className="text-[9px] text-stone-500 mt-0.5 block text-right">
-                    {MAX_MESSAGE_LENGTH - message.length} left
-                  </span>
-                )}
+
+                {/* Messages */}
+                <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2 min-h-[100px]">
+                  {!loaded && (
+                    <p className="text-xs text-stone-500 text-center py-6">
+                      Loading...
+                    </p>
+                  )}
+                  {loaded && messages.length === 0 && (
+                    <p className="text-xs text-stone-500 text-center py-6">
+                      No messages yet. Say hi!
+                    </p>
+                  )}
+                  {messages.map((msg) => {
+                    const isMe = msg.player_id === playerId;
+                    return (
+                      <div
+                        key={msg.id}
+                        className={cn(
+                          'animate-chat-in',
+                          isMe ? 'text-right' : 'text-left'
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            'inline-block px-3 py-1.5 rounded-2xl text-sm max-w-[80%] break-words leading-relaxed',
+                            isMe
+                              ? 'bg-blue-600 text-white rounded-br-md'
+                              : 'bg-stone-700 text-stone-100 rounded-bl-md'
+                          )}
+                        >
+                          {msg.text}
+                        </span>
+                        <div className="text-[10px] text-stone-500 mt-0.5 px-1">
+                          {getSenderName(msg.player_id)}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div ref={messagesEndRef} />
+                </div>
+
+                {/* Input bar */}
+                <div className="px-3 py-3 border-t border-stone-700 shrink-0 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+                  <div className="flex gap-2 items-center">
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      value={message}
+                      onChange={(e) =>
+                        setMessage(e.target.value.slice(0, MAX_MESSAGE_LENGTH))
+                      }
+                      onKeyDown={handleKeyDown}
+                      placeholder="Type a message..."
+                      className="flex-1 bg-stone-700 text-white text-sm rounded-xl px-4 py-2.5
+                                 placeholder:text-stone-400 outline-none focus:ring-2 focus:ring-blue-400/50
+                                 border border-stone-600"
+                      style={{ fontSize: '16px' }}
+                      maxLength={MAX_MESSAGE_LENGTH}
+                      autoComplete="off"
+                      enterKeyHint="send"
+                    />
+                    <button
+                      onClick={sendMessage}
+                      disabled={!message.trim()}
+                      className={cn(
+                        'w-10 h-10 rounded-xl flex items-center justify-center transition-all shrink-0',
+                        message.trim()
+                          ? 'bg-blue-600 hover:bg-blue-500 text-white active:scale-95'
+                          : 'bg-stone-700 text-stone-500 cursor-not-allowed'
+                      )}
+                    >
+                      <Send className="w-4 h-4" />
+                    </button>
+                  </div>
+                  {message.length > MAX_MESSAGE_LENGTH - 20 && (
+                    <span className="text-[10px] text-stone-500 mt-1 block text-right px-1">
+                      {MAX_MESSAGE_LENGTH - message.length} left
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </>,

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, use } from 'react';
+import { useEffect, use, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { AuthProvider, useAuth } from '@/components/auth/AuthProvider';
 import { createClient } from '@/lib/supabase/client';
@@ -9,20 +9,12 @@ import { toast } from 'sonner';
 function JoinGameContent({ pin }: { pin: string }) {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const supabase = createClient();
-
-  console.log('JoinGameContent render:', { user: user?.username, loading, pin });
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
-    console.log('JoinGameContent useEffect:', { loading, hasUser: !!user });
-    
-    if (loading) {
-      console.log('Still loading auth...');
-      return;
-    }
+    if (loading) return;
 
     if (!user) {
-      console.log('No user, redirecting to login');
       // Store the pin and redirect to login
       sessionStorage.setItem('pendingGamePin', pin);
       router.push('/');
@@ -30,8 +22,6 @@ function JoinGameContent({ pin }: { pin: string }) {
     }
 
     const joinGame = async () => {
-      console.log('Joining game with PIN:', pin.toUpperCase(), 'User:', user.id);
-      
       // Find game by PIN (uppercase to match)
       const { data: game, error: fetchError } = await supabase
         .from('games')
@@ -39,10 +29,7 @@ function JoinGameContent({ pin }: { pin: string }) {
         .eq('pin', pin.toUpperCase())
         .single();
 
-      console.log('Game lookup result:', { game: game?.id, fetchError });
-
       if (fetchError || !game) {
-        console.error('Game not found:', fetchError);
         toast.error('Game not found');
         router.push('/dashboard');
         return;
@@ -70,7 +57,6 @@ function JoinGameContent({ pin }: { pin: string }) {
       }
 
       // Join as player 2
-      console.log('Attempting to join game:', game.id);
       const { error: updateError } = await supabase
         .from('games')
         .update({
@@ -80,7 +66,6 @@ function JoinGameContent({ pin }: { pin: string }) {
         .eq('id', game.id);
 
       if (updateError) {
-        console.error('Failed to join game:', updateError);
         toast.error('Failed to join game: ' + updateError.message);
         router.push('/dashboard');
         return;
@@ -88,7 +73,7 @@ function JoinGameContent({ pin }: { pin: string }) {
 
       // Notify player1 that someone joined
       try {
-        const notifyRes = await fetch('/api/notify', {
+        await fetch('/api/notify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -98,19 +83,17 @@ function JoinGameContent({ pin }: { pin: string }) {
             title: 'Player Joined!'
           }),
         });
-        const notifyData = await notifyRes.json();
-        console.log('Join notification result:', notifyData);
-      } catch (e) {
-        console.error('Failed to send join notification:', e);
+      } catch {
+        // Non-critical — player1 will see the game start via realtime
       }
 
-      console.log('Successfully joined game!');
-      toast.success('Joined game!');
+      // Navigate directly — the game page loading IS the feedback.
+      // No toast needed; the user just tapped "join" and seeing the
+      // game board appear is the confirmation.
       router.push(`/game/${game.id}`);
     };
 
-    joinGame().catch((err) => {
-      console.error('joinGame error:', err);
+    joinGame().catch(() => {
       toast.error('An error occurred');
       router.push('/dashboard');
     });

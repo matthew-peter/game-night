@@ -93,13 +93,6 @@ export function ClueInput({ game, playerRole, onGiveClue, hasActiveClue = false 
               setError(null);
               broadcastTypingClue();
             }}
-            onFocus={(e) => {
-              // Prevent iOS from scrolling the page to show this input.
-              // The game viewport is fixed, so we don't want any scroll movement.
-              e.preventDefault();
-              // Re-focus without scroll
-              e.target.focus({ preventScroll: true });
-            }}
             placeholder="ENTER CLUE"
             className={cn(
               'flex-1 uppercase font-bold text-sm h-10 bg-white/10 border-white/20 text-white placeholder:text-white/40',
