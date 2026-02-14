@@ -13,6 +13,7 @@ interface ScrabbleBoardProps {
   onRemovePending: (row: number, col: number) => void;
   disabled?: boolean;
   hasSelectedTile?: boolean;
+  isMyTurn?: boolean;
 }
 
 // Classic board-game palette — beige surface, colored premium squares
@@ -30,6 +31,7 @@ export function ScrabbleBoard({
   onRemovePending,
   disabled = false,
   hasSelectedTile = false,
+  isMyTurn = false,
 }: ScrabbleBoardProps) {
   const pendingSet = useMemo(
     () => new Set(pendingPlacements.map(p => `${p.row},${p.col}`)),
@@ -65,9 +67,14 @@ export function ScrabbleBoard({
 
   return (
     <div className="w-full max-w-[min(100vw-8px,460px)] mx-auto">
-      {/* Brown border frame, like a real board edge */}
+      {/* Board frame — golden when your turn, muted brown when waiting */}
       <div
-        className="grid gap-[1.5px] bg-[#8B7355] p-[2px] rounded-sm"
+        className={cn(
+          'grid gap-[1.5px] p-[2px] rounded-sm transition-colors duration-300',
+          isMyTurn
+            ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.3)]'
+            : 'bg-[#8B7355]',
+        )}
         style={{ gridTemplateColumns: `repeat(${BOARD_SIZE}, 1fr)` }}
       >
         {Array.from({ length: BOARD_SIZE }).map((_, row) =>

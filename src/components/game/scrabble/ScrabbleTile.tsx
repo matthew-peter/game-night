@@ -43,7 +43,7 @@ export function ScrabbleTile({
 
         // ── Font ──
         isBoard
-          ? 'text-[10px] sm:text-xs font-extrabold'
+          ? 'text-[13px] sm:text-[15px] font-extrabold'
           : 'text-[16px] sm:text-[18px] font-bold',
 
         // ── Surface — cream tiles stand out against beige board ──
@@ -74,8 +74,8 @@ export function ScrabbleTile({
         <span className={cn(
           'absolute font-bold leading-none text-[#8B7355]',
           isBoard
-            ? 'bottom-0 right-[1px] text-[4px] sm:text-[5px]'
-            : 'bottom-[2px] right-[3px] text-[7px]'
+            ? 'bottom-[1px] right-[2px] text-[7px] sm:text-[8px]'
+            : 'bottom-[2px] right-[3px] text-[8px]'
         )}>
           {value}
         </span>

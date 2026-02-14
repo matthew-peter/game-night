@@ -458,6 +458,7 @@ export function ScrabbleGame({
           onRemovePending={handleRemovePending}
           disabled={!isMyTurn || isSubmitting}
           hasSelectedTile={hasSelectedRackTile}
+          isMyTurn={isMyTurn}
         />
       </div>
 
