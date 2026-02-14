@@ -341,7 +341,8 @@ function DashboardContent() {
         });
 
       if (joinError) {
-        toast.error('Failed to join game');
+        console.error('Error joining game:', joinError);
+        toast.error('Failed to join game: ' + joinError.message);
         return;
       }
 
