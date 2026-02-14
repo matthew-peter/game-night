@@ -61,12 +61,13 @@ export function ScrabbleGame({
 
   const dragTileIndex = useRef<number | null>(null);
 
-  // Reset pending state when turn changes
+  // Reset pending state when turn changes (NOT when board_state ref changes —
+  // the periodic sync creates new object refs which would wipe tiles mid-placement)
   useEffect(() => {
     setPendingPlacements([]);
     setSelectedRackIndices(new Set());
     setMode('play');
-  }, [game.current_turn, game.board_state]);
+  }, [game.current_turn]);
 
   // ── Available rack tiles (not yet placed on board) ────────────────────
   const availableRackTiles = useMemo(() => {
@@ -380,35 +381,33 @@ export function ScrabbleGame({
   }
 
   // ── Active game layout ────────────────────────────────────────────────
-  // Everything fits on screen: header → scoreboard → board → rack → actions
   const hasSelectedRackTile = mode === 'play' && selectedRackIndices.size === 1;
 
   return (
     <div className="fixed inset-0 bg-stone-900 flex flex-col overflow-hidden">
-      {/* Header — compact */}
       <Header />
 
-      {/* Scoreboard + chat */}
-      <div className="relative shrink-0">
-        <ScrabbleScoreboard
-          boardState={boardState}
-          players={players}
-          currentTurn={game.current_turn}
-          mySeat={mySeat}
-          userId={user.id}
-        />
-        <div className="absolute right-2 top-1/2 -translate-y-1/2">
-          <GameChat
-            gameId={game.id}
-            playerId={user.id}
-            playerName={user.username}
-            otherPlayers={chatOtherPlayers}
+      {/* Scoreboard + chat — single row */}
+      <div className="shrink-0 flex items-center pr-2">
+        <div className="flex-1 min-w-0">
+          <ScrabbleScoreboard
+            boardState={boardState}
+            players={players}
+            currentTurn={game.current_turn}
+            mySeat={mySeat}
+            userId={user.id}
           />
         </div>
+        <GameChat
+          gameId={game.id}
+          playerId={user.id}
+          playerName={user.username}
+          otherPlayers={chatOtherPlayers}
+        />
       </div>
 
-      {/* Board — fills available space, centered vertically */}
-      <main className="flex-1 min-h-0 flex items-center justify-center px-1.5 py-1">
+      {/* Board — directly below scoreboard, no extra spacing */}
+      <div className="shrink-0 px-1 pt-1">
         <ScrabbleBoard
           cells={boardState.cells}
           pendingPlacements={pendingPlacements}
@@ -417,10 +416,13 @@ export function ScrabbleGame({
           disabled={!isMyTurn || isSubmitting}
           hasSelectedTile={hasSelectedRackTile}
         />
-      </main>
+      </div>
 
-      {/* Bottom area — rack + actions, anchored */}
-      <div className="shrink-0 bg-stone-900/95 border-t border-stone-800 pb-safe">
+      {/* Spacer pushes rack to bottom */}
+      <div className="flex-1" />
+
+      {/* Rack + actions — anchored to bottom */}
+      <div className="shrink-0 pb-safe">
         <TileRack
           tiles={displayedRackTiles.map(t => t.letter)}
           selectedIndices={selectedRackIndices}

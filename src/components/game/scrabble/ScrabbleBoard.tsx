@@ -15,12 +15,12 @@ interface ScrabbleBoardProps {
   hasSelectedTile?: boolean;
 }
 
-// Warm, muted board-game palette
-const PREMIUM_STYLES: Record<NonNullable<PremiumType>, { bg: string; text: string; label: string }> = {
-  TW: { bg: 'bg-red-800',    text: 'text-red-200',    label: '3W' },
-  DW: { bg: 'bg-rose-400/80', text: 'text-rose-900',   label: '2W' },
-  TL: { bg: 'bg-blue-700',   text: 'text-blue-200',   label: '3L' },
-  DL: { bg: 'bg-sky-400/70',  text: 'text-sky-900',    label: '2L' },
+// Dark, warm palette — premium squares are subtle tints, not garish colors
+const PREMIUM: Record<NonNullable<PremiumType>, { cell: string; label: string; text: string }> = {
+  TW: { cell: 'bg-red-950/60',  label: '3W', text: 'text-red-400/80' },
+  DW: { cell: 'bg-rose-950/50', label: '2W', text: 'text-rose-400/70' },
+  TL: { cell: 'bg-blue-950/60', label: '3L', text: 'text-blue-400/80' },
+  DL: { cell: 'bg-sky-950/50',  label: '2L', text: 'text-sky-400/70' },
 };
 
 export function ScrabbleBoard({
@@ -35,7 +35,6 @@ export function ScrabbleBoard({
     () => new Set(pendingPlacements.map(p => `${p.row},${p.col}`)),
     [pendingPlacements]
   );
-
   const pendingMap = useMemo(() => {
     const m = new Map<string, TilePlacement>();
     for (const p of pendingPlacements) m.set(`${p.row},${p.col}`, p);
@@ -49,9 +48,7 @@ export function ScrabbleBoard({
 
   const handleDrop = useCallback((row: number, col: number, e: React.DragEvent) => {
     e.preventDefault();
-    if (disabled) return;
-    if (cells[row][col] !== null) return;
-    if (pendingSet.has(`${row},${col}`)) return;
+    if (disabled || cells[row][col] !== null || pendingSet.has(`${row},${col}`)) return;
     onCellDrop(row, col);
   }, [cells, pendingSet, onCellDrop, disabled]);
 
@@ -67,71 +64,59 @@ export function ScrabbleBoard({
   }, [cells, pendingSet, onCellDrop, onRemovePending, disabled]);
 
   return (
-    <div className="w-full max-w-[min(100vw-12px,480px)] mx-auto">
+    <div className="w-full max-w-[min(100vw-8px,460px)] mx-auto">
       <div
-        className="grid gap-[1px] bg-[#1a3a2a] p-[1px] rounded-sm"
+        className="grid gap-[0.5px] bg-stone-800/80 rounded-[3px] overflow-hidden"
         style={{ gridTemplateColumns: `repeat(${BOARD_SIZE}, 1fr)` }}
       >
         {Array.from({ length: BOARD_SIZE }).map((_, row) =>
           Array.from({ length: BOARD_SIZE }).map((_, col) => {
             const cell = cells[row][col];
-            const pendingTile = pendingMap.get(`${row},${col}`);
+            const pending = pendingMap.get(`${row},${col}`);
             const premium = getPremium(row, col);
             const isCenter = row === CENTER_ROW && col === CENTER_COL;
-            const isEmpty = !cell && !pendingTile;
+            const isEmpty = !cell && !pending;
             const canPlace = isEmpty && !disabled && hasSelectedTile;
 
             return (
               <div
                 key={`${row}-${col}`}
                 className={cn(
-                  'aspect-square flex items-center justify-center relative',
-                  // Empty cell colors
-                  isEmpty && (
-                    premium
-                      ? PREMIUM_STYLES[premium].bg
-                      : isCenter
-                        ? 'bg-rose-400/80'
-                        : 'bg-[#4a8c5c]'
-                  ),
-                  // Cell with tile
-                  !isEmpty && 'bg-[#4a8c5c]',
-                  // Interactive states
-                  canPlace && 'cursor-pointer',
-                  canPlace && 'hover:brightness-125 hover:ring-1 hover:ring-amber-300/50',
+                  'aspect-square flex items-center justify-center',
+                  // Base cell color — warm dark gray
+                  isEmpty ? 'bg-stone-700' : 'bg-stone-700',
+                  // Premium tint
+                  isEmpty && premium && PREMIUM[premium].cell,
+                  // Center star bg
+                  isEmpty && isCenter && !premium && 'bg-rose-950/40',
+                  // Hover when placeable
+                  canPlace && 'cursor-pointer hover:bg-stone-600 transition-colors',
                 )}
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(row, col, e)}
                 onClick={() => handleCellClick(row, col)}
               >
                 {cell ? (
+                  <ScrabbleTile letter={cell.letter} isBlank={cell.isBlank} variant="board" />
+                ) : pending ? (
                   <ScrabbleTile
-                    letter={cell.letter}
-                    isBlank={cell.isBlank}
-                    isOnBoard
-                    size="board"
-                  />
-                ) : pendingTile ? (
-                  <ScrabbleTile
-                    letter={pendingTile.letter}
-                    isBlank={pendingTile.isBlank}
-                    isOnBoard
-                    isNewlyPlaced
-                    size="board"
+                    letter={pending.letter}
+                    isBlank={pending.isBlank}
+                    variant="board-pending"
                     onClick={disabled ? undefined : () => onRemovePending(row, col)}
                   />
                 ) : (
                   <>
                     {premium && (
                       <span className={cn(
-                        'text-[6px] sm:text-[7px] font-bold leading-none select-none pointer-events-none',
-                        PREMIUM_STYLES[premium].text,
+                        'text-[5.5px] sm:text-[7px] font-semibold leading-none select-none',
+                        PREMIUM[premium].text,
                       )}>
-                        {PREMIUM_STYLES[premium].label}
+                        {PREMIUM[premium].label}
                       </span>
                     )}
                     {isCenter && !premium && (
-                      <span className="text-[9px] sm:text-[11px] text-rose-200 font-bold select-none">★</span>
+                      <span className="text-[8px] sm:text-[10px] text-rose-400/60 select-none">★</span>
                     )}
                   </>
                 )}
