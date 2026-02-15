@@ -26,6 +26,7 @@ export function ScrabbleTile({
 }: ScrabbleTileProps) {
   const value = isBlank ? 0 : getTileValue(letter);
   const isBoard = variant === 'board' || variant === 'board-pending';
+  const hasValue = value > 0;
 
   return (
     <div
@@ -34,12 +35,15 @@ export function ScrabbleTile({
       onDragEnd={onDragEnd}
       onClick={onClick}
       className={cn(
-        'relative inline-flex select-none uppercase',
+        'relative inline-flex select-none uppercase items-center justify-center',
+
+        // Pad the bottom so the centered letter doesn't collide with the subscript
+        hasValue && (isBoard ? 'pb-[5px]' : 'pb-[12px] sm:pb-[14px]'),
 
         // ── Size ──
         isBoard
-          ? 'w-full h-full rounded-[2px] items-center justify-center'
-          : 'w-[50px] h-[50px] sm:w-14 sm:h-14 rounded-xl items-center justify-center',
+          ? 'w-full h-full rounded-[2px]'
+          : 'w-[50px] h-[50px] sm:w-14 sm:h-14 rounded-xl',
 
         // ── Surface ──
         variant === 'board'
@@ -64,19 +68,21 @@ export function ScrabbleTile({
         'transition-all duration-75',
       )}
     >
-      {/* Letter + value laid out together so they scale as one unit */}
+      {/* Letter — big and clear */}
       <span className={cn(
         'leading-none font-bold',
         isBoard ? 'text-[17px] sm:text-[19px]' : 'text-[24px] sm:text-[28px]',
       )}>
         {letter || ''}
       </span>
-      {value > 0 && (
+
+      {/* Value — bottom-right, clear of the letter */}
+      {hasValue && (
         <span className={cn(
-          'absolute font-semibold leading-none text-[#A0896A]',
+          'absolute leading-none font-semibold text-[#A0896A]',
           isBoard
             ? 'bottom-[0px] right-[1px] text-[9px] sm:text-[11px]'
-            : 'bottom-[5px] right-[5px] sm:bottom-[6px] sm:right-[6px] text-[12px] sm:text-[14px]'
+            : 'bottom-[4px] right-[5px] sm:bottom-[5px] sm:right-[6px] text-[13px] sm:text-[14px]'
         )}>
           {value}
         </span>
