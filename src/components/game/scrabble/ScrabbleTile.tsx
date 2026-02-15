@@ -34,30 +34,33 @@ export function ScrabbleTile({
       onDragEnd={onDragEnd}
       onClick={onClick}
       className={cn(
-        'relative inline-flex items-center justify-center select-none uppercase',
+        'relative inline-flex select-none uppercase',
+        // Letter sits upper-center, value in bottom-right
+        'justify-center',
+        isBoard ? 'items-start pt-[1px]' : 'items-start pt-[5px] sm:pt-[6px]',
 
         // ── Size ──
         isBoard
           ? 'w-full h-full rounded-[2px]'
           : 'w-[46px] h-[46px] sm:w-[52px] sm:h-[52px] rounded-lg',
 
-        // ── Font ──
+        // ── Font — board is lighter weight, rack is bold ──
         isBoard
-          ? 'text-[15px] sm:text-[17px] font-extrabold'
-          : 'text-[20px] sm:text-[22px] font-bold',
+          ? 'text-[16px] sm:text-[18px] font-semibold'
+          : 'text-[21px] sm:text-[23px] font-bold',
 
-        // ── Surface — 3D depth with gradient + shadow ──
+        // ── Surface ──
         variant === 'board'
           ? 'bg-gradient-to-b from-[#FAEFD4] to-[#E8D8B4] text-[#3B2F1E] shadow-[inset_0_1px_0_rgba(255,255,255,0.6),0_1px_2px_rgba(0,0,0,0.2)]'
           : variant === 'board-pending'
-            ? 'bg-gradient-to-b from-[#FFF8E1] to-[#F0E0B0] text-[#3B2F1E] ring-2 ring-amber-400 shadow-[0_0_6px_rgba(245,180,50,0.5)]'
-            : 'bg-gradient-to-b from-[#FAEFD4] to-[#E0CDA6] text-[#3B2F1E] shadow-[0_2px_4px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.7)]',
+            ? 'bg-gradient-to-b from-[#FFF8E1] to-[#F0E0B0] text-[#3B2F1E] ring-2 ring-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.4)]'
+            : 'bg-gradient-to-b from-[#FAEFD4] to-[#E0CDA6] text-[#3B2F1E] shadow-[0_3px_6px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.7)]',
 
         // Blank
         isBlank && 'text-stone-400',
 
         // Selected (rack)
-        isSelected && 'ring-2 ring-blue-500 scale-[1.08] shadow-[0_4px_12px_rgba(59,130,246,0.3)] z-10',
+        isSelected && 'ring-2 ring-emerald-500 scale-[1.08] shadow-[0_4px_12px_rgba(16,185,129,0.3)] z-10',
 
         // Dragging
         isDragging && 'opacity-30 scale-90',
@@ -72,10 +75,10 @@ export function ScrabbleTile({
       <span className="leading-none">{letter || ''}</span>
       {value > 0 && (
         <span className={cn(
-          'absolute font-bold leading-none text-[#8B7355]',
+          'absolute font-semibold leading-none text-[#9E8B6E]',
           isBoard
-            ? 'bottom-[1px] right-[2px] text-[8px] sm:text-[10px]'
-            : 'bottom-[4px] right-[5px] text-[10px] sm:text-[11px]'
+            ? 'bottom-[1px] right-[2px] text-[9px] sm:text-[10px]'
+            : 'bottom-[4px] right-[5px] text-[10px] sm:text-[12px]'
         )}>
           {value}
         </span>

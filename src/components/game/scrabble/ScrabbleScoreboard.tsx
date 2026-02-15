@@ -37,10 +37,10 @@ export function ScrabbleScoreboard({
 
   return (
     <div className={cn(
-      'mx-2 my-1 px-4 py-2.5 rounded-xl shadow-md transition-all duration-300',
+      'mx-2 my-1 px-4 py-2.5 rounded-2xl shadow-lg transition-all duration-300',
       isMyTurn
-        ? 'bg-gradient-to-r from-amber-500 to-amber-400 shadow-amber-500/20'
-        : 'bg-gradient-to-r from-[#8B1A1A] to-[#6D1515] shadow-stone-900/20',
+        ? 'bg-gradient-to-r from-emerald-500 to-emerald-400 shadow-emerald-500/25'
+        : 'bg-gradient-to-r from-stone-500 to-stone-400 shadow-stone-500/15',
     )}>
       {/* Turn label */}
       <div className="flex items-center justify-between mb-1">

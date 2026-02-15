@@ -16,13 +16,36 @@ interface ScrabbleBoardProps {
   isMyTurn?: boolean;
 }
 
-// Rounded, vivid premium squares
-const PREMIUM: Record<NonNullable<PremiumType>, { cell: string; label: string; text: string }> = {
-  TW: { cell: 'bg-[#D4453A]', label: '3W', text: 'text-white/90 font-extrabold' },
-  DW: { cell: 'bg-[#EFA0B8]', label: '2W', text: 'text-[#7D1F3E] font-extrabold' },
-  TL: { cell: 'bg-[#3486C0]', label: '3L', text: 'text-white/90 font-extrabold' },
-  DL: { cell: 'bg-[#8DC8E8]', label: '2L', text: 'text-[#154360] font-extrabold' },
+// Premium squares — each has a gradient + text style for a rich, layered look
+const PREMIUM: Record<NonNullable<PremiumType>, {
+  bg: string;
+  label: string;
+  text: string;
+}> = {
+  TW: {
+    bg: 'bg-gradient-to-br from-[#E55A50] to-[#C0392B]',
+    label: '3W',
+    text: 'text-white/80 font-bold',
+  },
+  DW: {
+    bg: 'bg-gradient-to-br from-[#F7B8C8] to-[#EFA0B8]',
+    label: '2W',
+    text: 'text-[#8B2252]/70 font-bold',
+  },
+  TL: {
+    bg: 'bg-gradient-to-br from-[#4A9CD8] to-[#2E78B0]',
+    label: '3L',
+    text: 'text-white/80 font-bold',
+  },
+  DL: {
+    bg: 'bg-gradient-to-br from-[#A0D8F0] to-[#80C0E0]',
+    label: '2L',
+    text: 'text-[#1A5070]/60 font-bold',
+  },
 };
+
+// Cell base: warm beige with a subtle inset shadow to feel like a "well"
+const CELL_BASE = 'bg-gradient-to-br from-[#E4D8BC] to-[#D8CCAE] shadow-[inset_0_1px_2px_rgba(0,0,0,0.08)]';
 
 export function ScrabbleBoard({
   cells,
@@ -66,9 +89,9 @@ export function ScrabbleBoard({
 
   return (
     <div className="w-full max-w-[min(100vw-16px,460px)] mx-auto">
-      {/* Board — rounded corners, shadow for depth */}
+      {/* Board frame — warm wood with rounded corners and deep shadow */}
       <div
-        className="grid gap-[1.5px] p-[3px] rounded-xl bg-[#8B7355] shadow-[0_4px_20px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.1)]"
+        className="grid gap-[2px] p-[4px] rounded-2xl bg-gradient-to-br from-[#A08A6A] to-[#7A6548] shadow-[0_6px_24px_rgba(0,0,0,0.18),0_2px_6px_rgba(0,0,0,0.1)]"
         style={{ gridTemplateColumns: `repeat(${BOARD_SIZE}, 1fr)` }}
       >
         {Array.from({ length: BOARD_SIZE }).map((_, row) =>
@@ -80,27 +103,27 @@ export function ScrabbleBoard({
             const isEmpty = !cell && !pending;
             const canPlace = isEmpty && !disabled && hasSelectedTile;
 
-            // Corner rounding for the outermost cells
-            const isTopLeft = row === 0 && col === 0;
-            const isTopRight = row === 0 && col === BOARD_SIZE - 1;
-            const isBottomLeft = row === BOARD_SIZE - 1 && col === 0;
-            const isBottomRight = row === BOARD_SIZE - 1 && col === BOARD_SIZE - 1;
-            const cornerClass = isTopLeft ? 'rounded-tl-lg' : isTopRight ? 'rounded-tr-lg' : isBottomLeft ? 'rounded-bl-lg' : isBottomRight ? 'rounded-br-lg' : '';
+            // Rounded corners on the four outermost cells
+            const corner =
+              row === 0 && col === 0 ? 'rounded-tl-xl' :
+              row === 0 && col === BOARD_SIZE - 1 ? 'rounded-tr-xl' :
+              row === BOARD_SIZE - 1 && col === 0 ? 'rounded-bl-xl' :
+              row === BOARD_SIZE - 1 && col === BOARD_SIZE - 1 ? 'rounded-br-xl' : '';
 
             return (
               <div
                 key={`${row}-${col}`}
                 className={cn(
-                  'aspect-square flex items-center justify-center',
-                  cornerClass,
-                  // Base: warm sandy beige
-                  'bg-[#DDD0B2]',
-                  // Premium square colors
-                  isEmpty && premium && PREMIUM[premium].cell,
+                  'aspect-square flex items-center justify-center rounded-[1px]',
+                  corner,
+                  // Base cell
+                  CELL_BASE,
+                  // Premium squares override the base
+                  isEmpty && premium && PREMIUM[premium].bg,
                   // Center star
-                  isEmpty && isCenter && !premium && 'bg-[#EFA0B8]',
-                  // Hover when a tile is selected
-                  canPlace && 'cursor-pointer hover:brightness-[0.92] transition-colors',
+                  isEmpty && isCenter && !premium && 'bg-gradient-to-br from-[#F7B8C8] to-[#EFA0B8]',
+                  // Hover highlight
+                  canPlace && 'cursor-pointer hover:brightness-[0.93] hover:shadow-[inset_0_0_4px_rgba(0,0,0,0.12)] transition-all',
                 )}
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(row, col, e)}
@@ -126,7 +149,7 @@ export function ScrabbleBoard({
                       </span>
                     )}
                     {isCenter && !premium && (
-                      <span className="text-[11px] sm:text-sm text-[#7D1F3E] font-bold select-none">★</span>
+                      <span className="text-[12px] sm:text-sm text-[#8B2252]/50 select-none">★</span>
                     )}
                   </>
                 )}
