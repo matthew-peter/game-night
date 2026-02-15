@@ -61,7 +61,7 @@ export function ScrabbleTile({
         The value is a subscript aligned to the bottom of the letter.
         They sit together as one group, centered in the tile.
       */}
-      <span className="inline-flex items-end gap-0">
+      <span className="inline-flex items-end gap-0 -mt-[2px]">
         <span className={cn(
           'font-bold leading-[0.85]',
           isBoard ? 'text-[19px] sm:text-[21px]' : 'text-[30px] sm:text-[34px]',
@@ -70,7 +70,7 @@ export function ScrabbleTile({
         </span>
         {value > 0 && (
           <span className={cn(
-            'font-semibold leading-none text-[#A0896A] -mb-[1px]',
+            'font-semibold leading-none text-[#6B5B45] -mb-[1px]',
             isBoard
               ? 'text-[8px] sm:text-[10px] ml-[0.5px]'
               : 'text-[13px] sm:text-[15px] ml-[1px]',
