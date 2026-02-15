@@ -64,7 +64,7 @@ export function ScrabbleTile({
       <span className="inline-flex items-end gap-0">
         <span className={cn(
           'font-bold leading-[0.85]',
-          isBoard ? 'text-[17px] sm:text-[19px]' : 'text-[26px] sm:text-[30px]',
+          isBoard ? 'text-[19px] sm:text-[21px]' : 'text-[30px] sm:text-[34px]',
         )}>
           {letter || ''}
         </span>
@@ -72,8 +72,8 @@ export function ScrabbleTile({
           <span className={cn(
             'font-semibold leading-none text-[#A0896A] -mb-[1px]',
             isBoard
-              ? 'text-[7px] sm:text-[8px] ml-[0.5px]'
-              : 'text-[11px] sm:text-[13px] ml-[1px]',
+              ? 'text-[8px] sm:text-[10px] ml-[0.5px]'
+              : 'text-[13px] sm:text-[15px] ml-[1px]',
           )}>
             {value}
           </span>
