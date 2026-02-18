@@ -17,7 +17,7 @@ function LandingContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-stone-50 to-white">
+      <div className="fixed inset-0 flex items-center justify-center bg-gradient-to-b from-stone-50 to-white">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-stone-600 mx-auto"></div>
           <p className="mt-4 text-stone-500">Loading...</p>
@@ -27,8 +27,9 @@ function LandingContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-stone-50 to-white">
-      <div className="max-w-4xl mx-auto px-4 py-8">
+    <div className="fixed inset-0 flex flex-col bg-gradient-to-b from-stone-50 to-white">
+      <div className="flex-1 overflow-y-auto">
+      <div className="max-w-4xl mx-auto px-4 py-8" style={{ paddingTop: 'calc(2rem + env(safe-area-inset-top))' }}>
         {/* Hero */}
         <div className="text-center mb-12">
           <h1 className="text-4xl sm:text-5xl font-bold text-stone-800 mb-2">
@@ -76,10 +77,11 @@ function LandingContent() {
         </div>
 
         {/* Footer */}
-        <div className="mt-16 text-center text-xs text-stone-400 space-y-1">
+        <div className="mt-16 text-center text-xs text-stone-400 space-y-1 pb-8">
           <p>Codenames Duet by Vlaada Chv&aacute;til &amp; Scot Eaton, published by Czech Games Edition.</p>
           <p>Scrabble is a registered trademark. This is a fan-made, non-commercial project.</p>
         </div>
+      </div>
       </div>
     </div>
   );

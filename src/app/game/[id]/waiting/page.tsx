@@ -130,7 +130,7 @@ function WaitingRoomContent({ gameId }: { gameId: string }) {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="fixed inset-0 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
       </div>
     );
@@ -146,10 +146,11 @@ function WaitingRoomContent({ gameId }: { gameId: string }) {
   }
 
   return (
-    <div className="min-h-screen bg-stone-50">
+    <div className="fixed inset-0 flex flex-col bg-stone-50">
       <Header />
       
-      <main className="max-w-lg mx-auto px-4 py-8">
+      <main className="flex-1 overflow-y-auto">
+      <div className="max-w-lg mx-auto px-4 py-8">
         <Card>
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">
@@ -247,6 +248,7 @@ function WaitingRoomContent({ gameId }: { gameId: string }) {
             </Button>
           </CardContent>
         </Card>
+      </div>
       </main>
     </div>
   );

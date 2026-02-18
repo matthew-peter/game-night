@@ -126,14 +126,15 @@
   input, textarea, select {
     font-size: 16px;
   }
-  /* Prevent overscroll bounce globally — the game page will lock scroll entirely */
+  /* Lock viewport height and prevent overscroll bounce */
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
   html {
     overflow-anchor: none;
-    overscroll-behavior: none;
     -webkit-overflow-scrolling: touch;
-  }
-  html, body {
-    overscroll-behavior: none;
   }
 }
 

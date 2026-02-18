@@ -162,7 +162,7 @@ function DashboardContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="fixed inset-0 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
       </div>
     );
@@ -390,10 +390,11 @@ function DashboardContent() {
   };
 
   return (
-    <div className="min-h-screen bg-stone-50">
+    <div className="fixed inset-0 flex flex-col bg-stone-50">
       <Header />
 
-      <main className="max-w-lg mx-auto px-4 py-4">
+      <main className="flex-1 overflow-y-auto" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      <div className="max-w-lg mx-auto px-4 py-4">
         <h1 className="text-xl font-bold text-stone-800 mb-4">
           Welcome, {user.username}!
         </h1>
@@ -783,6 +784,7 @@ function DashboardContent() {
             </Link>
           </CardContent>
         </Card>
+      </div>
       </main>
     </div>
   );
