@@ -43,7 +43,7 @@ export function checkAssassinHit(boardState: BoardState): boolean {
  * Checks if the game is in sudden death (no tokens left)
  */
 export function isInSuddenDeath(game: Game): boolean {
-  return game.sudden_death || game.timer_tokens <= 0;
+  return game.sudden_death === true;
 }
 
 /**
@@ -104,7 +104,9 @@ export function processGuess(
   const totalNeeded = countTotalAgentsNeeded(keyCard);
   const won = agentsFound >= totalNeeded;
   
-  const suddenDeath = game.sudden_death || game.timer_tokens <= 0;
+  // Only the explicit flag means sudden death — timer_tokens=0 alone means
+  // "last clue turn" where the guesser still gets their normal turn.
+  const suddenDeath = game.sudden_death === true;
   const suddenDeathLoss = suddenDeath && cardType === 'bystander';
   
   const gameOver = assassinHit || won || suddenDeathLoss;

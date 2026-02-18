@@ -255,7 +255,8 @@ function GamePageContent({ gameId }: { gameId: string }) {
     updateGame({
       current_phase: 'guess',
       timer_tokens: Math.max(0, game.timer_tokens - 1),
-      sudden_death: game.timer_tokens - 1 <= 0 ? true : game.sudden_death,
+      // Don't set sudden_death yet — guesser gets their full normal turn first.
+      // Sudden death activates when the turn ends.
     });
     clearSelectedWords();
 
@@ -309,9 +310,20 @@ function GamePageContent({ gameId }: { gameId: string }) {
         optimisticUpdates.status = 'completed';
         optimisticUpdates.result = result.won ? 'win' : 'loss';
       } else if (result.turnEnds) {
+        // Wrong guess — turn switches
         optimisticUpdates.current_turn = mySeat;
-        optimisticUpdates.current_phase = 'clue';
-      } else if (game.sudden_death || game.timer_tokens <= 0) {
+        if (game.timer_tokens <= 0 && !game.sudden_death) {
+          // Last clue turn just ended — transition to sudden death
+          optimisticUpdates.current_phase = 'guess';
+          optimisticUpdates.sudden_death = true;
+        } else if (game.sudden_death) {
+          // Already in sudden death (shouldn't reach here for bystander since gameOver would be true)
+          optimisticUpdates.current_phase = 'guess';
+        } else {
+          optimisticUpdates.current_phase = 'clue';
+        }
+      } else if (game.sudden_death) {
+        // Agent found in actual sudden death — check if side is cleared
         const clueGiverSeat = game.current_turn;
         const tempGame = { ...game, board_state: result.newBoardState };
         const remaining = getRemainingAgentsPerSeat(tempGame);
@@ -350,13 +362,13 @@ function GamePageContent({ gameId }: { gameId: string }) {
   const handleEndTurn = useCallback(async () => {
     if (!game || !user || mySeat === undefined) return;
 
-    const inSuddenDeath = game.timer_tokens <= 0 || game.sudden_death;
+    const alreadySuddenDeath = game.sudden_death === true;
+    const enteringSuddenDeath = !alreadySuddenDeath && game.timer_tokens <= 0;
+    const effectiveSuddenDeath = alreadySuddenDeath || enteringSuddenDeath;
     const playerCount = game.key_card.length;
 
-    if (inSuddenDeath) {
+    if (effectiveSuddenDeath) {
       const remaining = getRemainingAgentsPerSeat(game);
-      // After switching, the new clue giver seat is mySeat.
-      // Check if there are agents on my key for the other player to find.
       const myKeyRemaining = remaining[mySeat] ?? 0;
       if (myKeyRemaining === 0) {
         toast.error('Cannot end turn — your partner has no agents left to find');
@@ -366,7 +378,8 @@ function GamePageContent({ gameId }: { gameId: string }) {
 
     updateGame({
       current_turn: mySeat,
-      current_phase: inSuddenDeath ? 'guess' : 'clue',
+      current_phase: effectiveSuddenDeath ? 'guess' : 'clue',
+      ...(enteringSuddenDeath ? { sudden_death: true } : {}),
     });
 
     try {
@@ -496,7 +509,9 @@ function GamePageContent({ gameId }: { gameId: string }) {
   const inSuddenDeath = game.timer_tokens <= 0 || game.sudden_death;
 
   const lastClue = moves.filter(m => m.move_type === 'clue').slice(-1)[0] || null;
-  const currentClue = game.current_phase === 'guess' && !inSuddenDeath ? lastClue : null;
+  // Show the clue during the last clue's guess phase (sudden_death flag not yet set).
+  // Only hide the clue once actual sudden death is active.
+  const currentClue = game.current_phase === 'guess' && !game.sudden_death ? lastClue : null;
   const hasActiveClue = game.current_phase === 'guess' && lastClue !== null;
 
   const lastTurnBoundary = (() => {

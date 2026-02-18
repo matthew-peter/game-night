@@ -23,7 +23,8 @@ export function GameStatus({ game, mySeat, opponentName, opponentId, currentClue
   const isClueGiver = game.current_turn === mySeat;
   const isCluePhase = game.current_phase === 'clue';
   const isGuessPhase = game.current_phase === 'guess';
-  const inSuddenDeath = game.timer_tokens <= 0 || game.sudden_death;
+  const inSuddenDeath = game.sudden_death === true;
+  const lastClueTurn = !inSuddenDeath && game.timer_tokens <= 0;
 
   const agentsFound = countAgentsFound(game.board_state);
   const totalAgents = countTotalAgentsNeeded(game.key_card);
@@ -40,10 +41,17 @@ export function GameStatus({ game, mySeat, opponentName, opponentId, currentClue
 
   if (inSuddenDeath) {
     if (isGuessPhase && !isClueGiver) {
-      statusText = '💀 SUDDEN DEATH - GUESS!';
+      statusText = '💀 SUDDEN DEATH — GUESS!';
       isActive = true;
     } else {
       statusText = `💀 ${opponentName || 'Partner'} guessing...`;
+    }
+  } else if (lastClueTurn) {
+    if (isGuessPhase && !isClueGiver) {
+      statusText = '⏱ FINAL CLUE — GUESS!';
+      isActive = true;
+    } else {
+      statusText = `⏱ ${opponentName || 'Partner'} guessing...`;
     }
   } else if (isClueGiver) {
     if (isCluePhase) {

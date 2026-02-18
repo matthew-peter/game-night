@@ -172,7 +172,8 @@ export async function POST(
 
       if (newTokens <= 0) {
         updateData.timer_tokens = 0;
-        updateData.sudden_death = true;
+        // Don't set sudden_death yet — the guesser gets their full normal turn
+        // on this last clue. Sudden death activates when the turn ends.
       }
 
       const { error: updateError } = await supabase
@@ -264,7 +265,8 @@ export async function POST(
       const agentsFound = Object.values(newBoardState.revealed).filter(r => r.type === 'agent').length;
       const totalAgentsNeeded = countTotalAgentsNeeded(game.key_card);
       const won = agentsFound >= totalAgentsNeeded;
-      const suddenDeath = game.sudden_death || game.timer_tokens <= 0;
+      // Only use the explicit flag — timer_tokens=0 alone means "last clue turn"
+      const suddenDeath = game.sudden_death === true;
       const suddenDeathLoss = suddenDeath && cardType === 'bystander';
 
       if (assassinHit || suddenDeathLoss) {
@@ -279,8 +281,18 @@ export async function POST(
         // Wrong guess — switch turns
         const newClueGiverSeat = getNextSeat(currentTurn, playerCount);
         updateData.current_turn = newClueGiverSeat;
-        updateData.current_phase = 'clue';
-        resolveCluePhase(updateData, game.words, game.key_card, newBoardState, newClueGiverSeat, suddenDeath, playerCount);
+
+        // If tokens are exhausted but sudden_death flag isn't set yet,
+        // we're finishing the last clue's turn — NOW enter sudden death
+        const enteringSuddenDeath = !suddenDeath && game.timer_tokens <= 0;
+        const effectiveSuddenDeath = suddenDeath || enteringSuddenDeath;
+
+        if (enteringSuddenDeath) {
+          updateData.sudden_death = true;
+        }
+
+        updateData.current_phase = effectiveSuddenDeath ? 'guess' : 'clue';
+        resolveCluePhase(updateData, game.words, game.key_card, newBoardState, newClueGiverSeat, effectiveSuddenDeath, playerCount);
       } else if (suddenDeath) {
         // Agent found in sudden death — check if more agents remain on this side
         const currentSideAgents = game.key_card[currentTurn]?.agents ?? [];
@@ -352,9 +364,11 @@ export async function POST(
         console.error('Error creating move:', moveError);
       }
 
-      const inSuddenDeath = game.sudden_death || game.timer_tokens <= 0;
+      const alreadySuddenDeath = game.sudden_death === true;
+      const enteringSuddenDeath = !alreadySuddenDeath && game.timer_tokens <= 0;
+      const effectiveSuddenDeath = alreadySuddenDeath || enteringSuddenDeath;
 
-      if (inSuddenDeath) {
+      if (effectiveSuddenDeath) {
         const newTurnSeat = getNextSeat(currentTurn, playerCount);
         const tempGame = game as unknown as Parameters<typeof getRemainingAgentsPerSeat>[0];
         const remaining = getRemainingAgentsPerSeat(tempGame);
@@ -371,10 +385,16 @@ export async function POST(
       const newClueGiverSeat = getNextSeat(currentTurn, playerCount);
       const updateData: Record<string, unknown> = {
         current_turn: newClueGiverSeat,
-        current_phase: inSuddenDeath ? 'guess' : 'clue',
+        current_phase: effectiveSuddenDeath ? 'guess' : 'clue',
       };
 
-      if (!inSuddenDeath) {
+      if (enteringSuddenDeath) {
+        updateData.sudden_death = true;
+      }
+
+      if (effectiveSuddenDeath) {
+        resolveCluePhase(updateData, game.words, game.key_card, game.board_state, newClueGiverSeat, true, playerCount);
+      } else {
         resolveCluePhase(updateData, game.words, game.key_card, game.board_state, newClueGiverSeat, false, playerCount);
       }
 
