@@ -63,6 +63,7 @@ export async function POST(request: Request) {
         current_phase: 'clue',
         min_players: 2,
         max_players: 2,
+        sudden_death: false,
         board_state: {
           revealed: {},
           agents_found: [0, 0],

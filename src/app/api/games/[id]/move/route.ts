@@ -176,12 +176,14 @@ export async function POST(
         // on this last clue. Sudden death activates when the turn ends.
       }
 
-      const { error: updateError } = await supabase
+      const { data: updatedRow, error: updateError } = await supabase
         .from('games')
         .update(updateData)
-        .eq('id', id);
+        .eq('id', id)
+        .select('id')
+        .single();
 
-      if (updateError) {
+      if (updateError || !updatedRow) {
         console.error('Error updating game:', updateError);
         return NextResponse.json({ error: 'Failed to update game' }, { status: 500 });
       }
@@ -307,13 +309,15 @@ export async function POST(
         }
       }
 
-      const { error: updateError } = await supabase
+      const { data: updatedRow, error: updateError } = await supabase
         .from('games')
         .update(updateData)
-        .eq('id', id);
+        .eq('id', id)
+        .select('id')
+        .single();
 
-      if (updateError) {
-        console.error('Error updating game:', updateError);
+      if (updateError || !updatedRow) {
+        console.error('Error updating game after guess:', updateError);
         return NextResponse.json({ error: 'Failed to update game' }, { status: 500 });
       }
 
@@ -398,13 +402,15 @@ export async function POST(
         resolveCluePhase(updateData, game.words, game.key_card, game.board_state, newClueGiverSeat, false, playerCount);
       }
 
-      const { error: updateError } = await supabase
+      const { data: updatedRow, error: updateError } = await supabase
         .from('games')
         .update(updateData)
-        .eq('id', id);
+        .eq('id', id)
+        .select('id')
+        .single();
 
-      if (updateError) {
-        console.error('Error updating game:', updateError);
+      if (updateError || !updatedRow) {
+        console.error('Error updating game on end_turn:', updateError);
         return NextResponse.json({ error: 'Failed to update game' }, { status: 500 });
       }
 

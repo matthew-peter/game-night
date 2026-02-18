@@ -34,11 +34,11 @@ export function GameReview({ game, moves, mySeat, seatNames }: GameReviewProps) 
 
   return (
     <div className={cn(
-      'min-h-dvh flex flex-col pb-[env(safe-area-inset-bottom)]',
+      'fixed inset-0 overflow-y-auto game-scroll-area',
       won ? 'bg-gradient-to-b from-emerald-900 to-emerald-950' : 'bg-gradient-to-b from-red-900 to-stone-950'
-    )}>
+    )} style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       {/* Hero section */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
+      <div className="flex-shrink-0 flex flex-col items-center justify-center px-6 py-8 pb-[env(safe-area-inset-bottom)]">
         <div className="text-7xl mb-4">
           {won ? '🎉' : (assassinHit ? '💀' : '⏱️')}
         </div>
@@ -102,7 +102,7 @@ export function GameReview({ game, moves, mySeat, seatNames }: GameReviewProps) 
 
       {/* Board view */}
       {showBoard && (
-        <div className="bg-black/30 px-4 py-6">
+        <div className="bg-black/30 px-4 py-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
           <h3 className="text-white/70 text-sm font-semibold uppercase tracking-wide mb-3 text-center">Final Board</h3>
           <div className="grid grid-cols-5 gap-1 max-w-sm mx-auto">
             {game.words.map((word, index) => {
@@ -160,7 +160,7 @@ export function GameReview({ game, moves, mySeat, seatNames }: GameReviewProps) 
 
       {/* History */}
       {showHistory && (
-        <div className="bg-black/30 px-4 py-6 max-h-[50vh] overflow-y-auto">
+        <div className="bg-black/30 px-4 py-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
           <h3 className="text-white/70 text-sm font-semibold uppercase tracking-wide mb-3 text-center">Move History</h3>
           <div className="space-y-1 max-w-sm mx-auto">
             {moves.map((move) => (

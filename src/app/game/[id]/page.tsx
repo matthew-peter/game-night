@@ -392,8 +392,8 @@ function GamePageContent({ gameId }: { gameId: string }) {
       if (!res.ok) {
         const data = await res.json();
         toast.error(data.error || 'Failed to end turn');
-        await syncFromServer();
       }
+      await syncFromServer();
     } catch {
       toast.error('Network error — please try again');
       await syncFromServer();
