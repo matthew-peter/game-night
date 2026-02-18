@@ -12,7 +12,6 @@ import { GameChat } from '@/components/game/GameChat';
 import { Game, Seat, GamePlayer, getOtherPlayers } from '@/lib/supabase/types';
 import { ScrabbleBoardState, TilePlacement, PlacedTile, DictionaryMode } from '@/lib/game/scrabble/types';
 import { Reactions } from '@/components/game/Reactions';
-import { sendTurnNotification } from '@/lib/notifications';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Trophy, RotateCcw } from 'lucide-react';
@@ -233,25 +232,13 @@ export function ScrabbleGame({
       setPendingPlacements([]);
       setSelectedRackIndices(new Set());
       onGameUpdated();
-
-      // Only notify the player whose turn it is next
-      if (!data.gameOver && data.nextTurn !== undefined) {
-        const nextPlayer = players.find(p => p.seat === data.nextTurn && p.user_id !== user.id);
-        if (nextPlayer) {
-          sendTurnNotification(
-            game.id,
-            nextPlayer.user_id,
-            user.username,
-            `${user.username} played — your turn!`
-          );
-        }
-      }
+      // Notifications are now sent server-side
     } catch {
       toast.error('Network error — please try again');
     } finally {
       setIsSubmitting(false);
     }
-  }, [game.id, pendingPlacements, isSubmitting, onGameUpdated, opponents, user.username]);
+  }, [game.id, pendingPlacements, isSubmitting, onGameUpdated]);
 
   // ── Submit exchange ───────────────────────────────────────────────────
   const handleExchange = useCallback(async () => {
@@ -283,24 +270,13 @@ export function ScrabbleGame({
       setSelectedRackIndices(new Set());
       setMode('play');
       onGameUpdated();
-
-      if (!data.gameOver && data.nextTurn !== undefined) {
-        const nextPlayer = players.find(p => p.seat === data.nextTurn && p.user_id !== user.id);
-        if (nextPlayer) {
-          sendTurnNotification(
-            game.id,
-            nextPlayer.user_id,
-            user.username,
-            `${user.username} exchanged tiles — your turn!`
-          );
-        }
-      }
+      // Notifications are now sent server-side
     } catch {
       toast.error('Network error — please try again');
     } finally {
       setIsSubmitting(false);
     }
-  }, [game.id, selectedRackIndices, displayedRackTiles, isSubmitting, onGameUpdated, opponents, user.username]);
+  }, [game.id, selectedRackIndices, displayedRackTiles, isSubmitting, onGameUpdated]);
 
   // ── Submit pass ───────────────────────────────────────────────────────
   const handlePass = useCallback(async () => {
@@ -323,24 +299,13 @@ export function ScrabbleGame({
 
       toast.info('Turn passed');
       onGameUpdated();
-
-      if (!data.gameOver && data.nextTurn !== undefined) {
-        const nextPlayer = players.find(p => p.seat === data.nextTurn && p.user_id !== user.id);
-        if (nextPlayer) {
-          sendTurnNotification(
-            game.id,
-            nextPlayer.user_id,
-            user.username,
-            `${user.username} passed — your turn!`
-          );
-        }
-      }
+      // Notifications are now sent server-side
     } catch {
       toast.error('Network error — please try again');
     } finally {
       setIsSubmitting(false);
     }
-  }, [game.id, isSubmitting, onGameUpdated, opponents, user.username]);
+  }, [game.id, isSubmitting, onGameUpdated]);
 
   // ── Game over view ────────────────────────────────────────────────────
   if (game.status === 'completed') {

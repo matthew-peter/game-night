@@ -4,6 +4,7 @@ import { Seat } from '@/lib/supabase/types';
 import { ScrabbleBoardState, TilePlacement, MAX_SCORELESS_TURNS } from '@/lib/game/scrabble/types';
 import { placeTiles, exchangeTiles, passTurn } from '@/lib/game/scrabble/logic';
 import { loadServerDictionary } from '@/lib/game/scrabble/dictionary-server';
+import { pushToUser } from '@/lib/pushNotify';
 
 export async function POST(
   request: Request,
@@ -61,6 +62,21 @@ export async function POST(
     if (mySeat !== currentTurn) {
       return NextResponse.json({ error: "It's not your turn" }, { status: 400 });
     }
+
+    // Fetch all players (for notifications)
+    const { data: allPlayers } = await supabase
+      .from('game_players')
+      .select('user_id, seat, user:users!game_players_user_id_fkey(username)')
+      .eq('game_id', id);
+
+    const playersBySeat = new Map<number, { user_id: string; username: string }>();
+    if (allPlayers) {
+      for (const p of allPlayers) {
+        const uname = (p.user as unknown as { username: string })?.username ?? 'Player';
+        playersBySeat.set(p.seat, { user_id: p.user_id, username: uname });
+      }
+    }
+    const actingPlayerName = playersBySeat.get(mySeat)?.username ?? 'Player';
 
     const boardState = gameData.board_state as unknown as ScrabbleBoardState;
     const playerCount = gameData.max_players ?? 2;
@@ -120,6 +136,18 @@ export async function POST(
         return NextResponse.json({ error: 'Failed to update game' }, { status: 500 });
       }
 
+      // Notify the next player
+      if (!result.gameOver && result.nextTurn !== undefined) {
+        const nextPlayer = playersBySeat.get(result.nextTurn);
+        if (nextPlayer && nextPlayer.user_id !== user.id) {
+          await pushToUser(
+            nextPlayer.user_id,
+            id,
+            `${actingPlayerName} played — your turn!`
+          ).catch(() => {});
+        }
+      }
+
       return NextResponse.json({
         success: true,
         wordsFormed: result.wordsFormed,
@@ -173,6 +201,18 @@ export async function POST(
         return NextResponse.json({ error: 'Failed to update game' }, { status: 500 });
       }
 
+      // Notify the next player
+      if (!result.gameOver && result.nextTurn !== undefined) {
+        const nextPlayer = playersBySeat.get(result.nextTurn);
+        if (nextPlayer && nextPlayer.user_id !== user.id) {
+          await pushToUser(
+            nextPlayer.user_id,
+            id,
+            `${actingPlayerName} exchanged tiles — your turn!`
+          ).catch(() => {});
+        }
+      }
+
       return NextResponse.json({
         success: true,
         gameOver: result.gameOver,
@@ -209,6 +249,18 @@ export async function POST(
       if (updateError) {
         console.error('Error updating game:', updateError);
         return NextResponse.json({ error: 'Failed to update game' }, { status: 500 });
+      }
+
+      // Notify the next player
+      if (!result.gameOver && result.nextTurn !== undefined) {
+        const nextPlayer = playersBySeat.get(result.nextTurn);
+        if (nextPlayer && nextPlayer.user_id !== user.id) {
+          await pushToUser(
+            nextPlayer.user_id,
+            id,
+            `${actingPlayerName} passed — your turn!`
+          ).catch(() => {});
+        }
       }
 
       return NextResponse.json({

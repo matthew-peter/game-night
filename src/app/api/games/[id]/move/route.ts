@@ -4,6 +4,7 @@ import { validateClue } from '@/lib/game/clueValidator';
 import { getCardTypeForPlayer } from '@/lib/game/keyGenerator';
 import { isWordRevealed, getNextSeat, getRemainingAgentsPerSeat, countTotalAgentsNeeded } from '@/lib/game/gameLogic';
 import { BoardState, KeyCard, ClueStrictness, Seat, RevealedCard } from '@/lib/supabase/types';
+import { pushToUser } from '@/lib/pushNotify';
 
 /**
  * After a move that transitions to 'clue' phase, check if the new clue-giver
@@ -104,6 +105,21 @@ export async function POST(
       return NextResponse.json({ error: 'You are not in this game' }, { status: 403 });
     }
 
+    // Fetch all players (for notifications)
+    const { data: allPlayers } = await supabase
+      .from('game_players')
+      .select('user_id, seat, user:users!game_players_user_id_fkey(username)')
+      .eq('game_id', id);
+
+    const playersBySeat = new Map<number, { user_id: string; username: string }>();
+    if (allPlayers) {
+      for (const p of allPlayers) {
+        const uname = (p.user as unknown as { username: string })?.username ?? 'Player';
+        playersBySeat.set(p.seat, { user_id: p.user_id, username: uname });
+      }
+    }
+    const actingPlayerName = playersBySeat.get(playerRow.seat)?.username ?? 'Your partner';
+
     const mySeat: Seat = playerRow.seat;
     const currentTurn: Seat = game.current_turn;
     const playerCount = game.key_card.length; // 2 for Codenames Duet
@@ -167,6 +183,17 @@ export async function POST(
       if (updateError) {
         console.error('Error updating game:', updateError);
         return NextResponse.json({ error: 'Failed to update game' }, { status: 500 });
+      }
+
+      // Notify the guesser that a clue was given
+      const guesserSeatForClue = getNextSeat(currentTurn, playerCount);
+      const guesser = playersBySeat.get(guesserSeatForClue);
+      if (guesser && guesser.user_id !== user.id) {
+        await pushToUser(
+          guesser.user_id,
+          id,
+          `${actingPlayerName} gave a clue: "${clueWord.toUpperCase()}" — your turn to guess!`
+        ).catch(() => {});
       }
 
       return NextResponse.json({ success: true, newTokens });
@@ -278,10 +305,26 @@ export async function POST(
         return NextResponse.json({ error: 'Failed to update game' }, { status: 500 });
       }
 
+      // Send push notification
+      const isGameOver = assassinHit || won || suddenDeathLoss;
+      if (!isGameOver && updateData.current_turn !== undefined) {
+        // Turn switched — notify the new active player
+        const nextSeat = updateData.current_turn as Seat;
+        const nextPlayer = playersBySeat.get(nextSeat);
+        if (nextPlayer && nextPlayer.user_id !== user.id) {
+          const phase = updateData.current_phase === 'clue' ? 'give a clue' : 'guess';
+          await pushToUser(
+            nextPlayer.user_id,
+            id,
+            `${actingPlayerName} guessed — your turn to ${phase}!`
+          ).catch(() => {});
+        }
+      }
+
       return NextResponse.json({
         success: true,
         cardType,
-        gameOver: assassinHit || won || suddenDeathLoss,
+        gameOver: isGameOver,
         won: won && !assassinHit,
       });
     }
@@ -343,6 +386,18 @@ export async function POST(
       if (updateError) {
         console.error('Error updating game:', updateError);
         return NextResponse.json({ error: 'Failed to update game' }, { status: 500 });
+      }
+
+      // Notify the new active player
+      const endTurnNextSeat = (updateData.current_turn ?? newClueGiverSeat) as Seat;
+      const endTurnNext = playersBySeat.get(endTurnNextSeat);
+      if (endTurnNext && endTurnNext.user_id !== user.id) {
+        const phase = updateData.current_phase === 'clue' ? 'give a clue' : 'guess';
+        await pushToUser(
+          endTurnNext.user_id,
+          id,
+          `${actingPlayerName} ended their turn — your turn to ${phase}!`
+        ).catch(() => {});
       }
 
       return NextResponse.json({ success: true });

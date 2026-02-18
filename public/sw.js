@@ -1,4 +1,4 @@
-// Service Worker for Web Push Notifications
+// Service Worker for Web Push Notifications — v2
 //
 // Notification routing:
 // 1. User is on the SAME game page → suppress (real-time handles it)

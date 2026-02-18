@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     }
 
     const subscription = JSON.parse(subData.subscription);
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://game-night-gilt.vercel.app';
 
     const payload = JSON.stringify({
       title: title || "It's your turn!",

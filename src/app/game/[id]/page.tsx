@@ -16,7 +16,6 @@ import { useGameStore } from '@/lib/store/gameStore';
 import { createClient } from '@/lib/supabase/client';
 import { Game, Move, Seat, GamePlayer, getOtherPlayers, findSeat } from '@/lib/supabase/types';
 import { processGuess, getNextSeat, getRemainingAgentsPerSeat } from '@/lib/game/gameLogic';
-import { sendTurnNotification } from '@/lib/notifications';
 import { toast } from 'sonner';
 
 function GamePageContent({ gameId }: { gameId: string }) {
@@ -279,22 +278,12 @@ function GamePageContent({ gameId }: { gameId: string }) {
       }
 
       await syncFromServer();
-
-      // Notify opponent(s)
-      for (const opp of opponents) {
-        const oppUsername = opp.user?.username ?? 'Partner';
-        sendTurnNotification(
-          game.id,
-          opp.user_id,
-          user.username,
-          `${user.username} gave clue: "${clue.toUpperCase()}" (${clueNumber}) - Your turn to guess!`
-        );
-      }
+      // Notifications are now sent server-side from the move API
     } catch {
       toast.error('Network error — please try again');
       await syncFromServer();
     }
-  }, [game, user, mySeat, clearSelectedWords, opponents, updateGame, syncFromServer]);
+  }, [game, user, mySeat, clearSelectedWords, updateGame, syncFromServer]);
 
   // ── Handle guessing a word ────────────────────────────────────────────
   const handleGuess = useCallback(async (wordIndex: number) => {
