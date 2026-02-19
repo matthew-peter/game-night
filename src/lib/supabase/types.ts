@@ -11,9 +11,9 @@
 /** Seat index (0-based).  For 2-player games: 0 and 1. */
 export type Seat = number;
 
-export type GameType = 'codenames' | 'scrabble';
+export type GameType = 'codenames' | 'scrabble' | 'so_clover';
 export type GameStatus = 'waiting' | 'playing' | 'completed' | 'abandoned';
-export type MoveType = 'clue' | 'guess' | 'end_turn' | 'place_tiles' | 'exchange_tiles' | 'pass';
+export type MoveType = 'clue' | 'guess' | 'end_turn' | 'place_tiles' | 'exchange_tiles' | 'pass' | 'submit_clues' | 'place_cards' | 'submit_guess';
 export type CardType = 'agent' | 'bystander' | 'assassin';
 export type ClueStrictness = 'basic' | 'strict' | 'very_strict';
 
@@ -84,7 +84,7 @@ export interface Game {
 
   // Turn management (seat-indexed)
   current_turn: Seat;          // seat of the clue giver (Codenames) or active player
-  current_phase: 'clue' | 'guess' | 'play'; // 'play' for Scrabble
+  current_phase: 'clue' | 'guess' | 'play' | 'clue_writing' | 'resolution';
   current_clue_id: string | null;
 
   // Codenames-specific columns (nullable for other game types)

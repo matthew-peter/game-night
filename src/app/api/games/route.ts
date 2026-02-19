@@ -5,6 +5,7 @@ import { generateKeyCard } from '@/lib/game/keyGenerator';
 import { generatePin } from '@/lib/utils/pin';
 import { ClueStrictness, GameType } from '@/lib/supabase/types';
 import { createScrabbleBoardState } from '@/lib/game/scrabble/logic';
+import { createInitialBoardState as createSoCloverBoardState } from '@/lib/game/soclover/logic';
 
 export async function POST(request: Request) {
   try {
@@ -21,7 +22,26 @@ export async function POST(request: Request) {
 
     let gameInsert: Record<string, unknown>;
 
-    if (gameType === 'scrabble') {
+    if (gameType === 'so_clover') {
+      const maxPlayers = Math.min(Math.max(body.maxPlayers ?? 3, 3), 6);
+      const boardState = createSoCloverBoardState(maxPlayers);
+
+      gameInsert = {
+        game_type: 'so_clover',
+        pin,
+        status: 'waiting',
+        current_turn: 0,
+        current_phase: 'clue_writing',
+        min_players: maxPlayers,
+        max_players: maxPlayers,
+        board_state: boardState,
+        words: [],
+        key_card: [],
+        timer_tokens: 0,
+        clue_strictness: 'basic',
+        sudden_death: false,
+      };
+    } else if (gameType === 'scrabble') {
       const maxPlayers = Math.min(Math.max(body.maxPlayers ?? 2, 2), 4);
       const dictionaryMode = ['strict', 'friendly', 'off'].includes(body.dictionaryMode)
         ? body.dictionaryMode

@@ -13,7 +13,7 @@ interface PresenceIndicatorProps {
   /** Whether the local player is currently the active one (giving clue or guessing) */
   isMyTurn: boolean;
   /** Current phase of the game */
-  phase: 'clue' | 'guess' | 'play';
+  phase: 'clue' | 'guess' | 'play' | 'clue_writing' | 'resolution';
   /** Whether the local player is the clue giver */
   isClueGiver: boolean;
 }

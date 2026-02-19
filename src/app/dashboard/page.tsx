@@ -19,6 +19,8 @@ import { generatePin } from '@/lib/utils/pin';
 import { countAgentsFound, countTotalAgentsNeeded } from '@/lib/game/gameLogic';
 import { ClueStrictness, Game, GamePlayer, GameType, findSeat } from '@/lib/supabase/types';
 import { createScrabbleBoardState } from '@/lib/game/scrabble/logic';
+import { createInitialBoardState as createSoCloverBoardState } from '@/lib/game/soclover/logic';
+import { SoCloverBoardState } from '@/lib/game/soclover/types';
 import { toast } from 'sonner';
 import { Plus, Users, History, Play, Clock, Loader2, Trash2, Gamepad2 } from 'lucide-react';
 import Link from 'next/link';
@@ -47,6 +49,7 @@ function DashboardContent() {
   const [maxWordSwaps, setMaxWordSwaps] = useState(3);
   const [scrabbleMaxPlayers, setScrabbleMaxPlayers] = useState(2);
   const [scrabbleDictionaryMode, setScrabbleDictionaryMode] = useState<'strict' | 'friendly' | 'off'>('friendly');
+  const [soCloverMaxPlayers, setSoCloverMaxPlayers] = useState(4);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   // Fetch active games
@@ -182,7 +185,27 @@ function DashboardContent() {
 
       let gameInsert: Record<string, unknown>;
 
-      if (gameType === 'scrabble') {
+      if (gameType === 'so_clover') {
+        const maxPlayers = soCloverMaxPlayers;
+        const boardState = createSoCloverBoardState(maxPlayers);
+
+        gameInsert = {
+          id: gameId,
+          game_type: 'so_clover',
+          pin,
+          status: 'waiting',
+          current_turn: 0,
+          current_phase: 'clue_writing',
+          min_players: maxPlayers,
+          max_players: maxPlayers,
+          board_state: boardState,
+          words: [],
+          key_card: [],
+          timer_tokens: 0,
+          clue_strictness: 'basic',
+          sudden_death: false,
+        };
+      } else if (gameType === 'scrabble') {
         const maxPlayers = scrabbleMaxPlayers;
         const boardState = createScrabbleBoardState(maxPlayers, scrabbleDictionaryMode);
 
@@ -419,10 +442,17 @@ function DashboardContent() {
                     const opponents = gamePlayers.filter(p => p.user_id !== user.id);
                     const opponentNames = opponents.map(p => p.user?.username).filter(Boolean);
                     const isScrabble = game.game_type === 'scrabble';
+                    const isSoClover = game.game_type === 'so_clover';
 
                     // Turn detection
                     let isYourTurn = false;
-                    if (isScrabble) {
+                    if (isSoClover) {
+                      const scBs = game.board_state as unknown as SoCloverBoardState;
+                      const isClueWriting = game.current_phase === 'clue_writing';
+                      isYourTurn = isClueWriting
+                        ? !scBs.clovers[mySeat ?? 0]?.cluesSubmitted
+                        : scBs.spectatorOrder[scBs.currentSpectatorIdx] !== mySeat;
+                    } else if (isScrabble) {
                       isYourTurn = game.current_turn === mySeat;
                     } else {
                       const amIClueGiver = game.current_turn === mySeat;
@@ -435,7 +465,20 @@ function DashboardContent() {
                     let progressText = '';
                     let turnText = '';
                     if (!isWaiting) {
-                      if (isScrabble) {
+                      if (isSoClover) {
+                        const scBs = game.board_state as unknown as SoCloverBoardState;
+                        if (game.current_phase === 'clue_writing') {
+                          const submitted = scBs.clovers.filter(c => c.cluesSubmitted).length;
+                          progressText = `${submitted}/${scBs.clovers.length} clues`;
+                          turnText = scBs.clovers[mySeat ?? 0]?.cluesSubmitted ? 'Waiting...' : 'Write clues';
+                        } else {
+                          const round = scBs.currentSpectatorIdx + 1;
+                          progressText = `Round ${round}/${scBs.spectatorOrder.length}`;
+                          turnText = scBs.spectatorOrder[scBs.currentSpectatorIdx] === mySeat
+                            ? 'Spectating'
+                            : 'Your team guesses';
+                        }
+                      } else if (isScrabble) {
                         const bs = game.board_state as unknown as Record<string, unknown>;
                         const scores = (bs.scores as number[]) ?? [];
                         const myScore = mySeat !== undefined ? scores[mySeat] ?? 0 : 0;
@@ -452,8 +495,10 @@ function DashboardContent() {
                       }
                     }
 
-                    const gameTypeLabel = isScrabble ? 'Scrabble' : 'Codenames';
-                    const gameTypeColor = isScrabble ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700';
+                    const gameTypeLabel = isSoClover ? 'So Clover!' : isScrabble ? 'Scrabble' : 'Codenames';
+                    const gameTypeColor = isSoClover
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : isScrabble ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700';
 
                     return (
                       <div
@@ -551,7 +596,7 @@ function DashboardContent() {
                     {/* Game Type Selector */}
                     <div className="space-y-2">
                       <Label>Game</Label>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-3 gap-2">
                         <button
                           onClick={() => setGameType('codenames')}
                           className={`p-3 rounded-lg border-2 text-left transition-all ${
@@ -560,8 +605,8 @@ function DashboardContent() {
                               : 'border-stone-200 hover:border-stone-300'
                           }`}
                         >
-                          <div className="font-medium text-sm">Codenames Duet</div>
-                          <div className="text-xs text-stone-500 mt-0.5">2 players • Co-op word game</div>
+                          <div className="font-medium text-sm">Codenames</div>
+                          <div className="text-xs text-stone-500 mt-0.5">2 players • Co-op</div>
                         </button>
                         <button
                           onClick={() => setGameType('scrabble')}
@@ -572,7 +617,18 @@ function DashboardContent() {
                           }`}
                         >
                           <div className="font-medium text-sm">Scrabble</div>
-                          <div className="text-xs text-stone-500 mt-0.5">2-4 players • Word building</div>
+                          <div className="text-xs text-stone-500 mt-0.5">2-4 players</div>
+                        </button>
+                        <button
+                          onClick={() => setGameType('so_clover')}
+                          className={`p-3 rounded-lg border-2 text-left transition-all ${
+                            gameType === 'so_clover'
+                              ? 'border-emerald-600 bg-emerald-50'
+                              : 'border-stone-200 hover:border-stone-300'
+                          }`}
+                        >
+                          <div className="font-medium text-sm">So Clover!</div>
+                          <div className="text-xs text-stone-500 mt-0.5">3-6 players • Co-op</div>
                         </button>
                       </div>
                     </div>
@@ -622,6 +678,26 @@ function DashboardContent() {
                               : scrabbleDictionaryMode === 'strict'
                                 ? 'The server will reject words not found in the dictionary.'
                                 : 'Play anything. No dictionary checking available.'}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* So Clover Settings */}
+                    {gameType === 'so_clover' && (
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label>Number of Players: {soCloverMaxPlayers}</Label>
+                          <Slider
+                            value={[soCloverMaxPlayers]}
+                            onValueChange={(v) => setSoCloverMaxPlayers(v[0])}
+                            min={3}
+                            max={6}
+                            step={1}
+                            className="w-full"
+                          />
+                          <p className="text-xs text-stone-500">
+                            Cooperative word-association game. Everyone writes clues, then the team guesses together.
                           </p>
                         </div>
                       </div>
@@ -728,9 +804,9 @@ function DashboardContent() {
                   <Button
                     onClick={handleCreateGame}
                     disabled={creatingGame}
-                    className={`w-full ${gameType === 'scrabble' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-green-600 hover:bg-green-700'}`}
+                    className={`w-full ${gameType === 'scrabble' ? 'bg-amber-600 hover:bg-amber-700' : gameType === 'so_clover' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-green-600 hover:bg-green-700'}`}
                   >
-                    {creatingGame ? 'Creating...' : `Start ${gameType === 'scrabble' ? 'Scrabble' : 'Codenames'} Game`}
+                    {creatingGame ? 'Creating...' : `Start ${gameType === 'scrabble' ? 'Scrabble' : gameType === 'so_clover' ? 'So Clover!' : 'Codenames'} Game`}
                   </Button>
                 </DialogContent>
               </Dialog>

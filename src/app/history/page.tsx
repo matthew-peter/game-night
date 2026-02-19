@@ -11,8 +11,10 @@ import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase/client';
 import { Game, GamePlayer } from '@/lib/supabase/types';
 import { countAgentsFound, countTotalAgentsNeeded } from '@/lib/game/gameLogic';
+import { SoCloverBoardState } from '@/lib/game/soclover/types';
+import { computeTotalScore, maxPossibleScore } from '@/lib/game/soclover/logic';
 import { formatDistanceToNow } from 'date-fns';
-import { ArrowLeft, Trophy, Skull, Clock } from 'lucide-react';
+import { ArrowLeft, Trophy, Skull, Clock, Clover } from 'lucide-react';
 
 type GameWithPlayers = Game & {
   game_players?: (GamePlayer & { user?: { username: string } })[];
@@ -111,6 +113,50 @@ function HistoryContent() {
                 .filter(p => p.user_id !== user.id);
               const opponentNames = opponents.map(p => p.user?.username).filter(Boolean);
               const isScrabble = game.game_type === 'scrabble';
+              const isSoClover = game.game_type === 'so_clover';
+
+              if (isSoClover) {
+                const scBs = game.board_state as unknown as SoCloverBoardState;
+                const totalScore = computeTotalScore(scBs.roundScores);
+                const maxScore = maxPossibleScore(scBs.clovers.length);
+                const won = game.result === 'win';
+
+                return (
+                  <Link key={game.id} href={`/game/${game.id}`}>
+                    <Card className="hover:shadow-md transition-shadow cursor-pointer">
+                      <CardContent className="py-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">
+                              So Clover!
+                            </span>
+                            {won ? (
+                              <Trophy className="h-5 w-5 text-emerald-600" />
+                            ) : (
+                              <Clover className="h-5 w-5 text-stone-400" />
+                            )}
+                            <span className="font-medium">
+                              w/ {opponentNames.join(', ') || 'players'}
+                            </span>
+                          </div>
+                          <Badge variant={won ? 'default' : 'secondary'} className={won ? 'bg-emerald-600' : ''}>
+                            {totalScore}/{maxScore}
+                          </Badge>
+                        </div>
+
+                        <div className="flex items-center justify-between text-sm text-stone-500">
+                          <span>
+                            {scBs.clovers.length} players
+                          </span>
+                          <span>
+                            {game.ended_at && formatDistanceToNow(new Date(game.ended_at), { addSuffix: true })}
+                          </span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                );
+              }
 
               if (isScrabble) {
                 const bs = game.board_state as unknown as Record<string, unknown>;

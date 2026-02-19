@@ -154,12 +154,14 @@ function WaitingRoomContent({ gameId }: { gameId: string }) {
         <Card>
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">
-              {game.game_type === 'scrabble' ? 'Scrabble' : 'Codenames Duet'}
+              {game.game_type === 'so_clover' ? 'So Clover!' : game.game_type === 'scrabble' ? 'Scrabble' : 'Codenames Duet'}
             </CardTitle>
             <CardDescription>
-              {game.game_type === 'scrabble'
-                ? `Waiting for players (need ${game.max_players ?? 2} total)`
-                : 'Waiting for one more player'}
+              {game.game_type === 'so_clover'
+                ? `Waiting for players (need ${game.max_players ?? 3} total)`
+                : game.game_type === 'scrabble'
+                  ? `Waiting for players (need ${game.max_players ?? 2} total)`
+                  : 'Waiting for one more player'}
               {' — '}share the PIN or link to start
             </CardDescription>
           </CardHeader>
@@ -168,7 +170,7 @@ function WaitingRoomContent({ gameId }: { gameId: string }) {
             <div className="text-center">
               <p className="text-sm text-stone-500 mb-2">Game PIN</p>
               <div className="flex items-center justify-center gap-2">
-                <span className={`text-4xl font-mono font-bold tracking-[0.3em] ${game.game_type === 'scrabble' ? 'text-amber-600' : 'text-green-600'}`}>
+                <span className={`text-4xl font-mono font-bold tracking-[0.3em] ${game.game_type === 'so_clover' ? 'text-emerald-600' : game.game_type === 'scrabble' ? 'text-amber-600' : 'text-green-600'}`}>
                   {game.pin}
                 </span>
                 <Button
@@ -188,7 +190,7 @@ function WaitingRoomContent({ gameId }: { gameId: string }) {
 
             {/* Waiting animation */}
             <div className="flex items-center justify-center gap-2 py-4">
-              <Loader2 className={`h-5 w-5 animate-spin ${game.game_type === 'scrabble' ? 'text-amber-600' : 'text-green-600'}`} />
+              <Loader2 className={`h-5 w-5 animate-spin ${game.game_type === 'so_clover' ? 'text-emerald-600' : game.game_type === 'scrabble' ? 'text-amber-600' : 'text-green-600'}`} />
               <span className="text-stone-600">Waiting for players to join...</span>
             </div>
 
@@ -197,7 +199,9 @@ function WaitingRoomContent({ gameId }: { gameId: string }) {
               <h4 className="font-medium text-stone-700 mb-2">Game Settings</h4>
               <div className="grid grid-cols-2 gap-2 text-stone-600">
                 <span>Game:</span>
-                <span className="font-medium capitalize">{game.game_type === 'scrabble' ? 'Scrabble' : 'Codenames Duet'}</span>
+                <span className="font-medium capitalize">
+                  {game.game_type === 'so_clover' ? 'So Clover!' : game.game_type === 'scrabble' ? 'Scrabble' : 'Codenames Duet'}
+                </span>
                 <span>Players:</span>
                 <span className="font-medium">{game.max_players ?? 2}</span>
                 {game.game_type === 'scrabble' && (
@@ -232,7 +236,7 @@ function WaitingRoomContent({ gameId }: { gameId: string }) {
             {/* Share button */}
             <Button
               onClick={handleShare}
-              className={`w-full ${game.game_type === 'scrabble' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-green-600 hover:bg-green-700'}`}
+              className={`w-full ${game.game_type === 'so_clover' ? 'bg-emerald-600 hover:bg-emerald-700' : game.game_type === 'scrabble' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-green-600 hover:bg-green-700'}`}
             >
               <Share2 className="h-4 w-4 mr-2" />
               Share Invite Link

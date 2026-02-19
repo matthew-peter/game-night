@@ -12,6 +12,7 @@ import { GameReview } from '@/components/game/GameReview';
 import { InlineHistory } from '@/components/game/InlineHistory';
 import { SetupPhase } from '@/components/game/SetupPhase';
 import { ScrabbleGame } from '@/components/game/scrabble/ScrabbleGame';
+import { SoCloverGame } from '@/components/game/soclover/SoCloverGame';
 import { useGameStore } from '@/lib/store/gameStore';
 import { createClient } from '@/lib/supabase/client';
 import { Game, Move, Seat, GamePlayer, getOtherPlayers, findSeat } from '@/lib/supabase/types';
@@ -450,6 +451,19 @@ function GamePageContent({ gameId }: { gameId: string }) {
   if (game.game_type === 'scrabble') {
     return (
       <ScrabbleGame
+        game={game}
+        mySeat={mySeat}
+        user={{ id: user.id, username: user.username }}
+        players={players}
+        onGameUpdated={syncFromServer}
+      />
+    );
+  }
+
+  // ── So Clover: render dedicated So Clover game component ────────────────
+  if (game.game_type === 'so_clover') {
+    return (
+      <SoCloverGame
         game={game}
         mySeat={mySeat}
         user={{ id: user.id, username: user.username }}
