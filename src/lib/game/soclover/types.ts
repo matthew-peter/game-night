@@ -28,17 +28,18 @@ export const EDGE_LEFT = 3;
  *   zone 2 (BOTTOM): between cards 2 and 3
  *   zone 3 (LEFT):   between cards 0 and 2
  *
- * Each zone is fed by two card edges:
- *   TOP:    card 0's right edge + card 1's left edge
- *   RIGHT:  card 1's bottom edge + card 3's top edge
- *   BOTTOM: card 2's right edge + card 3's left edge
- *   LEFT:   card 0's bottom edge + card 2's top edge
+ * Clue zones sit on the OUTER perimeter of the clover. Each zone
+ * connects the outward-facing edges of its two adjacent cards:
+ *   TOP:    card 0's top edge    + card 1's top edge
+ *   RIGHT:  card 1's right edge  + card 3's right edge
+ *   BOTTOM: card 2's bottom edge + card 3's bottom edge
+ *   LEFT:   card 0's left edge   + card 2's left edge
  */
 export const ZONE_CONTRIBUTIONS: { pos: number; edge: number }[][] = [
-  [{ pos: 0, edge: EDGE_RIGHT }, { pos: 1, edge: EDGE_LEFT }],   // TOP
-  [{ pos: 1, edge: EDGE_BOTTOM }, { pos: 3, edge: EDGE_TOP }],   // RIGHT
-  [{ pos: 2, edge: EDGE_RIGHT }, { pos: 3, edge: EDGE_LEFT }],   // BOTTOM
-  [{ pos: 0, edge: EDGE_BOTTOM }, { pos: 2, edge: EDGE_TOP }],   // LEFT
+  [{ pos: 0, edge: EDGE_TOP }, { pos: 1, edge: EDGE_TOP }],         // TOP
+  [{ pos: 1, edge: EDGE_RIGHT }, { pos: 3, edge: EDGE_RIGHT }],     // RIGHT
+  [{ pos: 2, edge: EDGE_BOTTOM }, { pos: 3, edge: EDGE_BOTTOM }],   // BOTTOM
+  [{ pos: 0, edge: EDGE_LEFT }, { pos: 2, edge: EDGE_LEFT }],       // LEFT
 ];
 
 /**
