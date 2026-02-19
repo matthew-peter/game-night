@@ -133,7 +133,7 @@ export function SoCloverReview({
             <CloverBoard
               cards={boardState.keywordCards}
               placements={currentClover.cardIndices}
-              orientations={currentClover.orientations}
+              rotations={currentClover.rotations}
               clues={currentClover.clues}
             />
           </div>

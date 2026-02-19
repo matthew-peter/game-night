@@ -1,97 +1,116 @@
 // ============================================================================
 // So Clover — Type definitions
+//
+// Each keyword card has 4 words, one on each edge (top, right, bottom, left).
+// Cards can be rotated 0°, 90°, 180°, or 270° clockwise (represented as 0–3).
 // ============================================================================
 
-export interface SoCloverKeywordCard {
-  words: [string, string];
-}
+/**
+ * A keyword card with 4 words, one per edge.
+ * Index 0 = top, 1 = right, 2 = bottom, 3 = left (at rotation 0).
+ */
+export type KeywordCardWords = [string, string, string, string];
+
+/** Edge indices */
+export const EDGE_TOP = 0;
+export const EDGE_RIGHT = 1;
+export const EDGE_BOTTOM = 2;
+export const EDGE_LEFT = 3;
 
 /**
- * Clue zones are ordered: top, right, bottom, left (clockwise from top).
- *
  * Card positions in the 2×2 clover grid:
  *   [0] [1]
  *   [2] [3]
  *
- * Zone adjacency:
- *   top    → cards 0, 1
- *   right  → cards 1, 3
- *   bottom → cards 2, 3
- *   left   → cards 0, 2
+ * Clue zones (clockwise from top):
+ *   zone 0 (TOP):    between cards 0 and 1
+ *   zone 1 (RIGHT):  between cards 1 and 3
+ *   zone 2 (BOTTOM): between cards 2 and 3
+ *   zone 3 (LEFT):   between cards 0 and 2
+ *
+ * Each zone is fed by two card edges:
+ *   TOP:    card 0's right edge + card 1's left edge
+ *   RIGHT:  card 1's bottom edge + card 3's top edge
+ *   BOTTOM: card 2's right edge + card 3's left edge
+ *   LEFT:   card 0's bottom edge + card 2's top edge
  */
-export const ZONE_PAIRS: [number, number][] = [
-  [0, 1], // top
-  [1, 3], // right
-  [2, 3], // bottom
-  [0, 2], // left
+export const ZONE_CONTRIBUTIONS: { pos: number; edge: number }[][] = [
+  [{ pos: 0, edge: EDGE_RIGHT }, { pos: 1, edge: EDGE_LEFT }],   // TOP
+  [{ pos: 1, edge: EDGE_BOTTOM }, { pos: 3, edge: EDGE_TOP }],   // RIGHT
+  [{ pos: 2, edge: EDGE_RIGHT }, { pos: 3, edge: EDGE_LEFT }],   // BOTTOM
+  [{ pos: 0, edge: EDGE_BOTTOM }, { pos: 2, edge: EDGE_TOP }],   // LEFT
 ];
 
 /**
- * For each card position, which word index (0 or 1) faces each zone.
- * orientations[pos] = true means word[0] faces the "first" zone for that position.
+ * Get the word at a given edge of a card after applying rotation.
  *
- * Card 0 participates in zones: top (idx 0), left (idx 3)
- * Card 1 participates in zones: top (idx 0), right (idx 1)
- * Card 2 participates in zones: bottom (idx 2), left (idx 3)
- * Card 3 participates in zones: right (idx 1), bottom (idx 2)
- *
- * When orientation is true:
- *   Card 0: word[0] → top,  word[1] → left
- *   Card 1: word[0] → top,  word[1] → right
- *   Card 2: word[0] → left, word[1] → bottom
- *   Card 3: word[0] → right, word[1] → bottom
+ * When a card rotates r steps clockwise, each word shifts:
+ *   the word originally at position p is now at position (p + r) % 4
+ * So to find what's at edge e after rotation r:
+ *   words[(e - r + 4) % 4]
  */
+export function getWordAtEdge(
+  words: KeywordCardWords,
+  rotation: number,
+  edge: number
+): string {
+  return words[((edge - rotation) % 4 + 4) % 4];
+}
+
+/**
+ * Get all 4 edge words after rotation, in display order [top, right, bottom, left].
+ */
+export function getRotatedWords(
+  words: KeywordCardWords,
+  rotation: number
+): [string, string, string, string] {
+  return [
+    getWordAtEdge(words, rotation, EDGE_TOP),
+    getWordAtEdge(words, rotation, EDGE_RIGHT),
+    getWordAtEdge(words, rotation, EDGE_BOTTOM),
+    getWordAtEdge(words, rotation, EDGE_LEFT),
+  ];
+}
+
 export interface PlayerClover {
   cardIndices: number[];       // 4 indices into keywordCards
   decoyCardIndex: number;      // 5th decoy card index
   clues: (string | null)[];    // 4 clues, indexed by zone (top, right, bottom, left)
   cluesSubmitted: boolean;
-  orientations: boolean[];     // 4 booleans, one per card position
+  rotations: number[];         // 4 rotation values (0–3), one per card position
   score: number | null;
 }
 
 export interface CurrentGuess {
   placements: (number | null)[]; // 4 positions → card index or null
-  orientations: boolean[];       // flip state per position (4 booleans)
+  rotations: number[];           // rotation per position (0–3)
   attempt: 1 | 2;
-  firstAttemptResults: boolean[] | null; // which positions were correct on 1st attempt
+  firstAttemptResults: boolean[] | null;
 }
 
 export interface SoCloverBoardState {
-  keywordCards: [string, string][]; // all keyword cards generated for this game
-  clovers: PlayerClover[];          // indexed by seat
+  keywordCards: KeywordCardWords[];  // all keyword cards generated for this game
+  clovers: PlayerClover[];           // indexed by seat
 
-  spectatorOrder: number[];         // seat order for resolution rounds
-  currentSpectatorIdx: number;      // -1 = clue_writing phase, 0+ = resolution round index
+  spectatorOrder: number[];          // seat order for resolution rounds
+  currentSpectatorIdx: number;       // -1 = clue_writing phase, 0+ = resolution round index
 
   currentGuess: CurrentGuess | null;
-  roundScores: (number | null)[];   // score per spectator round
+  roundScores: (number | null)[];    // score per spectator round
 }
 
 export type SoCloverMoveType = 'submit_clues' | 'place_cards' | 'submit_guess';
 
 export interface SubmitCluesData {
-  clues: string[];          // 4 clues
-  orientations: boolean[];  // 4 booleans (player may have flipped cards while writing)
+  clues: string[];
 }
 
 export interface PlaceCardsData {
-  placements: (number | null)[]; // 4 positions → card index or null
-  orientations: boolean[];       // 4 booleans for placed card orientations
+  placements: (number | null)[];
+  rotations: number[];
 }
 
 export interface SubmitGuessData {
   placements: (number | null)[];
-  orientations: boolean[];
-}
-
-/**
- * Given a card position and its orientation, returns [wordForFirstZone, wordForSecondZone].
- * "First zone" and "second zone" depend on the position — see ZONE_PAIRS.
- */
-export function getWordsForPosition(
-  card: [string, string],
-  orientation: boolean
-): [string, string] {
-  return orientation ? [card[0], card[1]] : [card[1], card[0]];
+  rotations: number[];
 }

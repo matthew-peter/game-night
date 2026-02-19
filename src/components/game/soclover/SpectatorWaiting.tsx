@@ -38,7 +38,7 @@ export function SpectatorWaiting({
           <CloverBoard
             cards={boardState.keywordCards}
             placements={guess.placements}
-            orientations={guess.orientations}
+            rotations={guess.rotations}
             clues={boardState.clovers[mySeat].clues}
             compact
           />

@@ -1,9 +1,10 @@
 'use client';
 
 import { KeywordCard } from './KeywordCard';
+import { KeywordCardWords } from '@/lib/game/soclover/types';
 
 interface CardTrayProps {
-  cards: [string, string][];
+  cards: KeywordCardWords[];
   cardIndices: number[];
   placedIndices: (number | null)[];
   onDragStart: (cardIndex: number) => void;
@@ -11,7 +12,6 @@ interface CardTrayProps {
 
 export function CardTray({ cards, cardIndices, placedIndices, onDragStart }: CardTrayProps) {
   const placedSet = new Set(placedIndices.filter((i): i is number => i !== null));
-
   const availableCards = cardIndices.filter((idx) => !placedSet.has(idx));
 
   return (
@@ -24,9 +24,10 @@ export function CardTray({ cards, cardIndices, placedIndices, onDragStart }: Car
           <KeywordCard
             key={cardIdx}
             words={cards[cardIdx]}
-            orientation={true}
+            rotation={0}
             draggable
             onDragStart={() => onDragStart(cardIdx)}
+            size="sm"
           />
         ))}
         {availableCards.length === 0 && (

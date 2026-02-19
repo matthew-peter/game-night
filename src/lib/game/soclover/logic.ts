@@ -7,7 +7,9 @@ import {
   SoCloverBoardState,
   PlayerClover,
   CurrentGuess,
-  ZONE_PAIRS,
+  KeywordCardWords,
+  ZONE_CONTRIBUTIONS,
+  getWordAtEdge,
 } from './types';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -21,23 +23,26 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
+function randomRotation(): number {
+  return Math.floor(Math.random() * 4);
+}
+
 // ── Card dealing ────────────────────────────────────────────────────────────
 
 /**
- * Generate keyword cards for a game. Each card has 2 words.
- * We need 4 cards per player + 1 decoy per player = 5 per player.
- * We generate a few extra to ensure variety.
+ * Generate keyword cards for a game. Each card has 4 words (one per edge).
+ * We need 5 cards per player (4 real + 1 decoy).
  */
 export function generateKeywordCards(
   playerCount: number
-): [string, string][] {
+): KeywordCardWords[] {
   const cardsNeeded = playerCount * 5;
-  const wordsNeeded = cardsNeeded * 2;
+  const wordsNeeded = cardsNeeded * 4;
 
   const shuffled = shuffle(KEYWORDS).slice(0, wordsNeeded);
-  const cards: [string, string][] = [];
-  for (let i = 0; i < shuffled.length - 1; i += 2) {
-    cards.push([shuffled[i], shuffled[i + 1]]);
+  const cards: KeywordCardWords[] = [];
+  for (let i = 0; i + 3 < shuffled.length; i += 4) {
+    cards.push([shuffled[i], shuffled[i + 1], shuffled[i + 2], shuffled[i + 3]]);
   }
   return cards;
 }
@@ -61,7 +66,7 @@ export function createInitialBoardState(playerCount: number): SoCloverBoardState
       decoyCardIndex,
       clues: [null, null, null, null],
       cluesSubmitted: false,
-      orientations: [true, true, true, true],
+      rotations: [randomRotation(), randomRotation(), randomRotation(), randomRotation()],
       score: null,
     });
   }
@@ -84,7 +89,7 @@ export function createInitialBoardState(playerCount: number): SoCloverBoardState
 
 /**
  * Validate that clues are legal: single word, not empty, not one of the
- * player's 8 keywords.
+ * player's 16 keywords (4 cards × 4 words).
  */
 export function validateClues(
   clues: string[],
@@ -112,7 +117,7 @@ export function validateClues(
 }
 
 /**
- * Get all 8 keywords from a player's clover.
+ * Get all 16 keywords from a player's clover (4 cards × 4 words).
  */
 export function getPlayerKeywords(
   boardState: SoCloverBoardState,
@@ -126,99 +131,69 @@ export function getPlayerKeywords(
   return keywords;
 }
 
-// ── Pair computation ────────────────────────────────────────────────────────
+// ── Zone word computation ───────────────────────────────────────────────────
 
 /**
- * For a given zone, returns the two words that face it based on card
- * placements and orientations.
+ * Get the two words facing a given zone based on card placements and rotations.
  *
- * Card positions in 2×2 grid:
- *   [0] [1]
- *   [2] [3]
- *
- * Zone adjacency (which two card positions touch each zone):
- *   zone 0 (top):    cards at pos 0, 1
- *   zone 1 (right):  cards at pos 1, 3
- *   zone 2 (bottom): cards at pos 2, 3
- *   zone 3 (left):   cards at pos 0, 2
- *
- * Each card position has two zones it touches. The orientation boolean
- * determines which word (index 0 or 1) faces which zone.
- *
- * For card at position P with orientation O:
- *   "first zone" = the zone listed first for that card in CARD_ZONE_MAP
- *   O = true  → word[0] faces first zone, word[1] faces second zone
- *   O = false → word[1] faces first zone, word[0] faces second zone
+ * Each zone is defined by two (position, edge) pairs in ZONE_CONTRIBUTIONS.
+ * For a card at a given position with a given rotation, the word at a
+ * specific edge is: words[(edge - rotation + 4) % 4]
  */
+export function getWordsForZone(
+  cards: KeywordCardWords[],
+  placements: (number | null)[],
+  rotations: number[],
+  zone: number
+): [string | null, string | null] {
+  const contributions = ZONE_CONTRIBUTIONS[zone];
+  const results: (string | null)[] = [];
 
-const CARD_ZONE_MAP: Record<number, [number, number]> = {
-  0: [0, 3], // card 0: top, left
-  1: [0, 1], // card 1: top, right
-  2: [3, 2], // card 2: left, bottom
-  3: [1, 2], // card 3: right, bottom
-};
-
-/**
- * Given a card index in a position, and the zone we're asking about,
- * return which word of the card faces that zone.
- */
-export function getWordFacingZone(
-  card: [string, string],
-  position: number,
-  zone: number,
-  orientation: boolean
-): string {
-  const [firstZone] = CARD_ZONE_MAP[position];
-  const isFirstZone = zone === firstZone;
-
-  if (orientation) {
-    return isFirstZone ? card[0] : card[1];
-  } else {
-    return isFirstZone ? card[1] : card[0];
+  for (const { pos, edge } of contributions) {
+    const cardIdx = placements[pos];
+    if (cardIdx == null) {
+      results.push(null);
+    } else {
+      results.push(getWordAtEdge(cards[cardIdx], rotations[pos], edge));
+    }
   }
+
+  return [results[0], results[1]];
 }
 
 /**
- * Get the two words facing a given zone based on current placements.
+ * Convenience: get zone words for a player's own clover (used in clue writing).
  */
-export function getWordsForZone(
-  cards: [string, string][],
-  placements: (number | null)[],
-  orientations: boolean[],
+export function getZoneWordsForClover(
+  boardState: SoCloverBoardState,
+  seat: number,
   zone: number
-): [string | null, string | null] {
-  const [pos1, pos2] = ZONE_PAIRS[zone];
-  const cardIdx1 = placements[pos1];
-  const cardIdx2 = placements[pos2];
-
-  const word1 =
-    cardIdx1 != null
-      ? getWordFacingZone(cards[cardIdx1], pos1, zone, orientations[pos1])
-      : null;
-  const word2 =
-    cardIdx2 != null
-      ? getWordFacingZone(cards[cardIdx2], pos2, zone, orientations[pos2])
-      : null;
-
-  return [word1, word2];
+): [string, string] {
+  const clover = boardState.clovers[seat];
+  return getWordsForZone(
+    boardState.keywordCards,
+    clover.cardIndices,
+    clover.rotations,
+    zone
+  ) as [string, string];
 }
 
 // ── Scoring ─────────────────────────────────────────────────────────────────
 
 /**
  * Compare a guess placement against the original clover.
- * Returns an array of 4 booleans — true if position is correct
- * (same card AND same orientation).
+ * A position is correct if the same card is placed there AND the same
+ * rotation is applied (so the same words face the same zones).
  */
 export function checkPlacements(
   originalClover: PlayerClover,
   guessPlacements: (number | null)[],
-  guessOrientations: boolean[]
+  guessRotations: number[]
 ): boolean[] {
   return originalClover.cardIndices.map((origCard, pos) => {
     const guessCard = guessPlacements[pos];
     if (guessCard !== origCard) return false;
-    return guessOrientations[pos] === originalClover.orientations[pos];
+    return guessRotations[pos] === originalClover.rotations[pos];
   });
 }
 
@@ -226,49 +201,38 @@ export function checkPlacements(
  * Compute the score for a resolution round.
  * - First attempt, all 4 correct: 6 points
  * - Second attempt: 1 point per correct position (0–4)
+ * Returns -1 to signal "go to attempt 2" on a failed first attempt.
  */
 export function computeRoundScore(
   originalClover: PlayerClover,
   guess: CurrentGuess,
   guessPlacements: (number | null)[],
-  guessOrientations: boolean[]
+  guessRotations: number[]
 ): number {
-  const results = checkPlacements(originalClover, guessPlacements, guessOrientations);
+  const results = checkPlacements(originalClover, guessPlacements, guessRotations);
   const correctCount = results.filter(Boolean).length;
 
   if (guess.attempt === 1) {
-    return correctCount === 4 ? 6 : -1; // -1 signals "go to attempt 2"
+    return correctCount === 4 ? 6 : -1;
   }
 
   return correctCount;
 }
 
-/**
- * Compute the final total score across all rounds.
- */
 export function computeTotalScore(roundScores: (number | null)[]): number {
   return roundScores.reduce<number>((sum, s) => sum + (s ?? 0), 0);
 }
 
-/**
- * Maximum possible score for a game with N players.
- */
 export function maxPossibleScore(playerCount: number): number {
   return playerCount * 6;
 }
 
 // ── Phase transitions ───────────────────────────────────────────────────────
 
-/**
- * Check if all players have submitted their clues.
- */
 export function allCluesSubmitted(boardState: SoCloverBoardState): boolean {
   return boardState.clovers.every((c) => c.cluesSubmitted);
 }
 
-/**
- * Check if all resolution rounds are complete.
- */
 export function allRoundsComplete(boardState: SoCloverBoardState): boolean {
   return (
     boardState.currentSpectatorIdx >= boardState.spectatorOrder.length - 1 &&
@@ -276,9 +240,6 @@ export function allRoundsComplete(boardState: SoCloverBoardState): boolean {
   );
 }
 
-/**
- * Get the current spectator's seat number, or null if in clue_writing phase.
- */
 export function getCurrentSpectatorSeat(
   boardState: SoCloverBoardState
 ): number | null {
@@ -298,13 +259,10 @@ export function getResolutionCardIndices(
   return shuffle([...clover.cardIndices, clover.decoyCardIndex]);
 }
 
-/**
- * Prepare a fresh CurrentGuess for a new resolution round.
- */
 export function createFreshGuess(): CurrentGuess {
   return {
     placements: [null, null, null, null],
-    orientations: [true, true, true, true],
+    rotations: [0, 0, 0, 0],
     attempt: 1,
     firstAttemptResults: null,
   };

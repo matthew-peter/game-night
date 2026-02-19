@@ -39,11 +39,11 @@ export function ResolutionPhase({
   );
 
   const placements = guess?.placements ?? [null, null, null, null];
-  const orientations = guess?.orientations ?? [true, true, true, true];
+  const rotations = guess?.rotations ?? [0, 0, 0, 0];
 
   const sendPlacement = useCallback(async (
     newPlacements: (number | null)[],
-    newOrientations: boolean[]
+    newRotations: number[]
   ) => {
     try {
       await fetch(`/api/games/${gameId}/soclover-move`, {
@@ -52,7 +52,7 @@ export function ResolutionPhase({
         body: JSON.stringify({
           moveType: 'place_cards',
           placements: newPlacements,
-          orientations: newOrientations,
+          rotations: newRotations,
         }),
       });
     } catch {
@@ -70,44 +70,45 @@ export function ResolutionPhase({
     dragCardRef.current = null;
 
     const newPlacements = [...placements] as (number | null)[];
-    const newOrientations = [...orientations];
+    const newRotations = [...rotations];
 
     const existingPos = newPlacements.indexOf(cardIndex);
     if (existingPos !== -1) {
       newPlacements[existingPos] = null;
-      newOrientations[existingPos] = true;
+      newRotations[existingPos] = 0;
     }
 
     if (newPlacements[position] != null) {
       if (existingPos !== -1) {
         newPlacements[existingPos] = newPlacements[position];
-        newOrientations[existingPos] = newOrientations[position];
+        newRotations[existingPos] = newRotations[position];
       }
     }
 
     newPlacements[position] = cardIndex;
-    newOrientations[position] = true;
+    if (existingPos === -1) {
+      newRotations[position] = 0;
+    }
 
-    sendPlacement(newPlacements, newOrientations);
-  }, [placements, orientations, sendPlacement]);
+    sendPlacement(newPlacements, newRotations);
+  }, [placements, rotations, sendPlacement]);
 
-  const handleFlip = useCallback((position: number) => {
-    const newOrientations = [...orientations];
-    newOrientations[position] = !newOrientations[position];
-    sendPlacement([...placements], newOrientations);
-  }, [placements, orientations, sendPlacement]);
+  const handleRotate = useCallback((position: number) => {
+    const newRotations = [...rotations];
+    newRotations[position] = (newRotations[position] + 1) % 4;
+    sendPlacement([...placements], newRotations);
+  }, [placements, rotations, sendPlacement]);
 
   const handleRemove = useCallback((position: number) => {
     const newPlacements = [...placements] as (number | null)[];
-    const newOrientations = [...orientations];
+    const newRotations = [...rotations];
     newPlacements[position] = null;
-    newOrientations[position] = true;
-    sendPlacement(newPlacements, newOrientations);
-  }, [placements, orientations, sendPlacement]);
+    newRotations[position] = 0;
+    sendPlacement(newPlacements, newRotations);
+  }, [placements, rotations, sendPlacement]);
 
   const handleSubmitGuess = async () => {
-    const hasNulls = placements.some((p) => p === null);
-    if (hasNulls) {
+    if (placements.some((p) => p === null)) {
       toast.error('Place all 4 cards before submitting');
       return;
     }
@@ -120,7 +121,7 @@ export function ResolutionPhase({
         body: JSON.stringify({
           moveType: 'submit_guess',
           placements,
-          orientations,
+          rotations,
         }),
       });
 
@@ -154,7 +155,7 @@ export function ResolutionPhase({
           {spectatorName}&apos;s Clover
         </h2>
         <p className="text-sm text-stone-400">
-          {attemptLabel} — Place the cards to match the clues
+          {attemptLabel} — Place and rotate cards to match the clues
         </p>
         {guess?.attempt === 2 && guess.firstAttemptResults && (
           <p className="text-xs text-amber-400 mt-1">
@@ -167,10 +168,10 @@ export function ResolutionPhase({
         <CloverBoard
           cards={boardState.keywordCards}
           placements={placements}
-          orientations={orientations}
+          rotations={rotations}
           clues={spectatorClover.clues}
           onDrop={handleDrop}
-          onFlip={handleFlip}
+          onRotate={handleRotate}
           onRemove={handleRemove}
           highlights={guess?.firstAttemptResults?.map((r) =>
             r ? 'correct' : null

@@ -4,8 +4,8 @@ import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CloverBoard } from './CloverBoard';
-import { SoCloverBoardState, ZONE_PAIRS } from '@/lib/game/soclover/types';
-import { getWordFacingZone } from '@/lib/game/soclover/logic';
+import { SoCloverBoardState } from '@/lib/game/soclover/types';
+import { getZoneWordsForClover } from '@/lib/game/soclover/logic';
 import { cn } from '@/lib/utils';
 import { Send, Check, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -32,43 +32,22 @@ export function ClueWritingPhase({
   const alreadySubmitted = clover.cluesSubmitted;
 
   const zoneWordPairs = useMemo(() => {
-    return ZONE_PAIRS.map((pair, zoneIdx) => {
-      const words: string[] = [];
-      for (const pos of pair) {
-        const localPos = clover.cardIndices.indexOf(
-          clover.cardIndices[pos] // This is the card at this position
-        );
-        if (localPos === -1) continue;
-        const card = boardState.keywordCards[clover.cardIndices[pos]];
-        const word = getWordFacingZone(
-          card,
-          pos,
-          zoneIdx,
-          clover.orientations[pos]
-        );
-        words.push(word);
-      }
-      return words;
-    });
-  }, [boardState.keywordCards, clover]);
+    return [0, 1, 2, 3].map((zone) => getZoneWordsForClover(boardState, mySeat, zone));
+  }, [boardState, mySeat]);
 
   const otherPlayersStatus = useMemo(() => {
-    return boardState.clovers.map((c, i) => ({
-      seat: i,
-      submitted: c.cluesSubmitted,
-    })).filter((_, i) => i !== mySeat);
+    return boardState.clovers
+      .map((c, i) => ({ seat: i, submitted: c.cluesSubmitted }))
+      .filter((_, i) => i !== mySeat);
   }, [boardState.clovers, mySeat]);
 
   const handleSubmit = async () => {
     const trimmed = clues.map((c) => c.trim());
-    const hasEmpty = trimmed.some((c) => !c);
-    if (hasEmpty) {
+    if (trimmed.some((c) => !c)) {
       toast.error('All 4 clues are required');
       return;
     }
-
-    const hasMultiWord = trimmed.some((c) => /\s/.test(c));
-    if (hasMultiWord) {
+    if (trimmed.some((c) => /\s/.test(c))) {
       toast.error('Each clue must be a single word');
       return;
     }
@@ -129,14 +108,14 @@ export function ClueWritingPhase({
       <div className="text-center">
         <h2 className="text-lg font-bold text-white">Write Your Clues</h2>
         <p className="text-sm text-stone-400">
-          One word per zone — connect the two keywords
+          One word per zone — connect the two keywords that face each other
         </p>
       </div>
 
       <CloverBoard
         cards={boardState.keywordCards}
         placements={clover.cardIndices}
-        orientations={clover.orientations}
+        rotations={clover.rotations}
         clues={clues.map((c) => c || null)}
         compact
       />
@@ -144,8 +123,8 @@ export function ClueWritingPhase({
       <div className="grid grid-cols-2 gap-3 px-2">
         {ZONE_NAMES.map((name, i) => (
           <div key={i} className="flex flex-col gap-1">
-            <label className="text-[0.65rem] uppercase tracking-widest text-emerald-400/70 font-medium">
-              {name}: {zoneWordPairs[i]?.join(' + ')}
+            <label className="text-[0.6rem] uppercase tracking-widest text-emerald-400/70 font-medium">
+              {name}: {zoneWordPairs[i][0]} + {zoneWordPairs[i][1]}
             </label>
             <Input
               value={clues[i]}

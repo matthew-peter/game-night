@@ -2,15 +2,16 @@
 
 import { cn } from '@/lib/utils';
 import { KeywordCard } from './KeywordCard';
+import { KeywordCardWords } from '@/lib/game/soclover/types';
 import { Clover } from 'lucide-react';
 
 interface CloverBoardProps {
-  cards: [string, string][];
+  cards: KeywordCardWords[];
   placements: (number | null)[];
-  orientations: boolean[];
+  rotations: number[];
   clues: (string | null)[];
   onDrop?: (position: number) => void;
-  onFlip?: (position: number) => void;
+  onRotate?: (position: number) => void;
   onRemove?: (position: number) => void;
   highlights?: ('correct' | 'incorrect' | null)[];
   interactive?: boolean;
@@ -22,10 +23,10 @@ const ZONE_LABELS = ['TOP', 'RIGHT', 'BOTTOM', 'LEFT'];
 export function CloverBoard({
   cards,
   placements,
-  orientations,
+  rotations,
   clues,
   onDrop,
-  onFlip,
+  onRotate,
   onRemove,
   highlights,
   interactive = false,
@@ -44,8 +45,7 @@ export function CloverBoard({
   };
 
   const cardSize = compact ? 'sm' as const : 'md' as const;
-  const cellBase = compact ? 'w-[4.5rem] h-[3.5rem]' : 'w-[5.5rem] h-[4.5rem]';
-  const clueCell = compact ? 'min-h-[1.5rem]' : 'min-h-[2rem]';
+  const slotSize = compact ? 'w-[5rem] h-[5rem]' : 'w-[6rem] h-[6rem]';
 
   const renderCardSlot = (position: number) => {
     const cardIdx = placements[position];
@@ -57,9 +57,9 @@ export function CloverBoard({
         <div className="relative group">
           <KeywordCard
             words={cards[cardIdx]}
-            orientation={orientations[position]}
-            flippable={interactive}
-            onFlip={() => onFlip?.(position)}
+            rotation={rotations[position]}
+            rotatable={interactive}
+            onRotate={() => onRotate?.(position)}
             highlight={highlight}
             size={cardSize}
           />
@@ -68,7 +68,7 @@ export function CloverBoard({
               onClick={() => onRemove?.(position)}
               className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white text-xs
                          flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity
-                         shadow-md hover:bg-red-400"
+                         shadow-md hover:bg-red-400 z-10"
             >
               ×
             </button>
@@ -82,7 +82,7 @@ export function CloverBoard({
         onDragOver={handleDragOver}
         onDrop={(e) => handleDrop(position, e)}
         className={cn(
-          cellBase,
+          slotSize,
           'rounded-xl border-2 border-dashed flex items-center justify-center transition-colors',
           interactive
             ? 'border-emerald-500/40 bg-emerald-900/20 hover:bg-emerald-900/40 hover:border-emerald-400/60'
@@ -96,96 +96,87 @@ export function CloverBoard({
     );
   };
 
-  const renderClueZone = (zoneIndex: number, direction: 'horizontal' | 'vertical') => {
+  const renderClueZone = (zoneIndex: number) => {
     const clue = clues[zoneIndex];
     return (
       <div
         className={cn(
-          'flex items-center justify-center',
-          clueCell,
-          direction === 'horizontal' ? 'col-span-2' : 'row-span-2',
+          'rounded-full px-3 py-0.5 text-center max-w-full',
+          clue
+            ? 'bg-white/90 text-stone-800 shadow-sm'
+            : 'bg-stone-700/50',
         )}
       >
-        <div
-          className={cn(
-            'rounded-full px-3 py-0.5 text-center max-w-full',
-            clue
-              ? 'bg-white/90 text-stone-800 shadow-sm'
-              : 'bg-stone-700/50',
-          )}
-        >
-          <span className={cn(
-            'font-bold uppercase tracking-wider',
-            compact ? 'text-[0.55rem]' : 'text-[0.65rem]',
-            !clue && 'text-stone-500 font-normal lowercase'
-          )}>
-            {clue ?? ZONE_LABELS[zoneIndex]}
-          </span>
-        </div>
+        <span className={cn(
+          'font-bold uppercase tracking-wider',
+          compact ? 'text-[0.5rem]' : 'text-[0.6rem]',
+          !clue && 'text-stone-500 font-normal lowercase'
+        )}>
+          {clue ?? ZONE_LABELS[zoneIndex]}
+        </span>
       </div>
     );
   };
 
+  /*
+   * Layout: 3×3 grid
+   *
+   *          [TOP clue]
+   *  [card0]  [clover]  [card1]
+   * [LEFT]              [RIGHT]
+   *  [card2]            [card3]
+   *         [BOTTOM clue]
+   *
+   * Using a 3-col, 3-row grid with clue zones positioned between.
+   */
+
   return (
-    <div className="flex flex-col items-center">
-      <div className={cn(
-        'grid gap-1',
-        'grid-cols-[auto_1fr_auto_1fr_auto]',
-        'grid-rows-[auto_1fr_auto_1fr_auto]',
-        'items-center justify-items-center'
-      )}>
-        {/* Row 0: empty | TOP clue (spans 2) | empty */}
-        <div />
-        <div className="col-span-3 flex justify-center">
-          {renderClueZone(0, 'horizontal')}
-        </div>
-        <div />
+    <div className="flex flex-col items-center gap-1">
+      {/* Top clue zone */}
+      <div className="flex justify-center">
+        {renderClueZone(0)}
+      </div>
 
-        {/* Row 1: LEFT clue (top half) | Card 0 | center | Card 1 | RIGHT clue (top half) */}
-        <div className="row-span-1 flex items-center justify-center">
-          {/* LEFT clue rendered spanning rows */}
-        </div>
-        <div className="col-span-1 flex justify-center">
-          {renderCardSlot(0)}
-        </div>
-        <div className="flex items-center justify-center w-8 h-8">
-          <Clover className="w-5 h-5 text-emerald-500/60" />
-        </div>
-        <div className="col-span-1 flex justify-center">
-          {renderCardSlot(1)}
-        </div>
-        <div className="row-span-1 flex items-center justify-center">
-          {/* RIGHT clue rendered spanning rows */}
+      {/* Middle row: card0 | center | card1, with LEFT and RIGHT clues */}
+      <div className="flex items-center gap-1">
+        {/* LEFT clue */}
+        <div className="flex items-center justify-center w-8">
+          <div className="-rotate-90">
+            {renderClueZone(3)}
+          </div>
         </div>
 
-        {/* Row 2: LEFT clue (rendered here) | center divider | RIGHT clue */}
-        <div className="flex items-center justify-center">
-          {renderClueZone(3, 'vertical')}
-        </div>
-        <div />
-        <div />
-        <div />
-        <div className="flex items-center justify-center">
-          {renderClueZone(1, 'vertical')}
+        {/* Card 0 */}
+        {renderCardSlot(0)}
+
+        {/* Center clover icon */}
+        <div className="flex items-center justify-center w-6">
+          <Clover className="w-4 h-4 text-emerald-500/50" />
         </div>
 
-        {/* Row 3: LEFT clue (bottom half) | Card 2 | center | Card 3 | RIGHT clue (bottom half) */}
-        <div />
-        <div className="col-span-1 flex justify-center">
-          {renderCardSlot(2)}
+        {/* Card 1 */}
+        {renderCardSlot(1)}
+
+        {/* RIGHT clue */}
+        <div className="flex items-center justify-center w-8">
+          <div className="rotate-90">
+            {renderClueZone(1)}
+          </div>
         </div>
+      </div>
+
+      {/* Bottom row: card2 | gap | card3 */}
+      <div className="flex items-center gap-1">
         <div className="w-8" />
-        <div className="col-span-1 flex justify-center">
-          {renderCardSlot(3)}
-        </div>
-        <div />
+        {renderCardSlot(2)}
+        <div className="w-6" />
+        {renderCardSlot(3)}
+        <div className="w-8" />
+      </div>
 
-        {/* Row 4: empty | BOTTOM clue (spans 2) | empty */}
-        <div />
-        <div className="col-span-3 flex justify-center">
-          {renderClueZone(2, 'horizontal')}
-        </div>
-        <div />
+      {/* Bottom clue zone */}
+      <div className="flex justify-center">
+        {renderClueZone(2)}
       </div>
     </div>
   );

@@ -133,16 +133,16 @@ export async function POST(
         return NextResponse.json({ error: 'Spectator cannot place cards' }, { status: 400 });
       }
 
-      const { placements, orientations } = body;
+      const { placements, rotations } = body;
       if (!Array.isArray(placements) || placements.length !== 4 ||
-          !Array.isArray(orientations) || orientations.length !== 4) {
+          !Array.isArray(rotations) || rotations.length !== 4) {
         return NextResponse.json({ error: 'Invalid placement data' }, { status: 400 });
       }
 
       const updatedGuess = {
         ...(boardState.currentGuess ?? createFreshGuess()),
         placements,
-        orientations,
+        rotations,
       };
 
       const updatedBoardState: SoCloverBoardState = {
@@ -180,9 +180,9 @@ export async function POST(
         return NextResponse.json({ error: 'No active guess' }, { status: 400 });
       }
 
-      const { placements, orientations } = body;
+      const { placements, rotations } = body;
       if (!Array.isArray(placements) || placements.length !== 4 ||
-          !Array.isArray(orientations) || orientations.length !== 4) {
+          !Array.isArray(rotations) || rotations.length !== 4) {
         return NextResponse.json({ error: 'Invalid guess data' }, { status: 400 });
       }
 
@@ -194,29 +194,27 @@ export async function POST(
       const spectatorClover = boardState.clovers[spectatorSeat!];
       const guess = boardState.currentGuess;
 
-      const score = computeRoundScore(spectatorClover, guess, placements, orientations);
+      const score = computeRoundScore(spectatorClover, guess, placements, rotations);
 
       const updatedBoardState: SoCloverBoardState = { ...boardState };
       const updatedRoundScores = [...boardState.roundScores];
 
       if (score === -1) {
-        // First attempt failed — remove incorrect cards, go to attempt 2
-        const results = checkPlacements(spectatorClover, placements, orientations);
+        const results = checkPlacements(spectatorClover, placements, rotations);
         const secondAttemptPlacements = placements.map(
           (p: number | null, i: number) => (results[i] ? p : null)
         );
-        const secondAttemptOrientations = orientations.map(
-          (o: boolean, i: number) => (results[i] ? o : true)
+        const secondAttemptRotations = rotations.map(
+          (r: number, i: number) => (results[i] ? r : 0)
         );
 
         updatedBoardState.currentGuess = {
           placements: secondAttemptPlacements,
-          orientations: secondAttemptOrientations,
+          rotations: secondAttemptRotations,
           attempt: 2,
           firstAttemptResults: results,
         };
       } else {
-        // Round is scored (either perfect first attempt or second attempt)
         const roundIdx = boardState.currentSpectatorIdx;
         updatedRoundScores[boardState.spectatorOrder[roundIdx]] = score;
         updatedBoardState.roundScores = updatedRoundScores;
@@ -226,7 +224,6 @@ export async function POST(
           score,
         };
 
-        // Advance to next spectator or end game
         if (allRoundsComplete({ ...updatedBoardState, roundScores: updatedRoundScores })) {
           const totalScore = computeTotalScore(updatedRoundScores);
           const maxScore = boardState.clovers.length * 6;
@@ -253,7 +250,7 @@ export async function POST(
             game_id: id,
             player_id: user.id,
             move_type: 'submit_guess',
-            move_data: { placements, orientations, score, totalScore, gameComplete: true },
+            move_data: { placements, rotations, score, totalScore, gameComplete: true },
           });
 
           return NextResponse.json({ success: true, score, totalScore, gameComplete: true });
@@ -279,7 +276,7 @@ export async function POST(
         game_id: id,
         player_id: user.id,
         move_type: 'submit_guess',
-        move_data: { placements, orientations, score },
+        move_data: { placements, rotations, score },
       });
 
       return NextResponse.json({ success: true, score });
