@@ -11,8 +11,6 @@ interface KeywordCardProps {
   onRotate?: () => void;
   selected?: boolean;
   onSelect?: () => void;
-  draggable?: boolean;
-  onDragStart?: (e: React.DragEvent) => void;
   highlight?: 'correct' | 'incorrect' | null;
   size?: 'sm' | 'md';
   dimmed?: boolean;
@@ -26,8 +24,6 @@ export function KeywordCard({
   onRotate,
   selected = false,
   onSelect,
-  draggable = false,
-  onDragStart,
   highlight = null,
   size = 'md',
   dimmed = false,
@@ -48,13 +44,11 @@ export function KeywordCard({
 
   return (
     <div
-      draggable={draggable}
-      onDragStart={onDragStart}
       onClick={handleClick}
       className={cn(
         'relative rounded-xl border-2 select-none transition-all duration-200 flex-shrink-0',
         cardSize,
-        (onSelect || draggable) && 'cursor-pointer active:scale-95',
+        (onSelect) && 'cursor-pointer active:scale-95',
         selected && 'ring-2 ring-white shadow-white/30 shadow-lg scale-105',
         highlight === 'correct' && 'ring-2 ring-emerald-400 shadow-emerald-400/30 shadow-lg',
         highlight === 'incorrect' && 'ring-2 ring-red-400 shadow-red-400/30 shadow-lg',
@@ -63,37 +57,41 @@ export function KeywordCard({
         className
       )}
     >
-      {/* Top word */}
-      <div className="absolute top-1 left-1 right-1 flex justify-center overflow-hidden">
-        <span className={cn(fontSize, 'font-bold text-stone-700 tracking-wide leading-none uppercase truncate')}>{top}</span>
+      {/* Top word — centered horizontally at top edge */}
+      <div className="absolute top-0.5 inset-x-0 flex justify-center">
+        <span className={cn(fontSize, 'font-bold text-stone-700 tracking-wide leading-none uppercase text-center truncate max-w-[80%]')}>
+          {top}
+        </span>
       </div>
 
-      {/* Right word — vertical */}
-      <div className="absolute top-1 bottom-1 right-0.5 flex items-center overflow-hidden">
+      {/* Right word — centered vertically at right edge */}
+      <div className="absolute inset-y-0 right-0 flex items-center justify-center w-3">
         <span
-          className={cn(fontSize, 'font-bold text-stone-700 tracking-wide leading-none uppercase')}
+          className={cn(fontSize, 'font-bold text-stone-700 tracking-wide leading-none uppercase text-center')}
           style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}
         >
           {right}
         </span>
       </div>
 
-      {/* Bottom word */}
-      <div className="absolute bottom-1 left-1 right-1 flex justify-center overflow-hidden">
-        <span className={cn(fontSize, 'font-bold text-stone-700 tracking-wide leading-none uppercase truncate')}>{bottom}</span>
+      {/* Bottom word — centered horizontally at bottom edge */}
+      <div className="absolute bottom-0.5 inset-x-0 flex justify-center">
+        <span className={cn(fontSize, 'font-bold text-stone-700 tracking-wide leading-none uppercase text-center truncate max-w-[80%]')}>
+          {bottom}
+        </span>
       </div>
 
-      {/* Left word — vertical */}
-      <div className="absolute top-1 bottom-1 left-0.5 flex items-center overflow-hidden">
+      {/* Left word — centered vertically at left edge */}
+      <div className="absolute inset-y-0 left-0 flex items-center justify-center w-3">
         <span
-          className={cn(fontSize, 'font-bold text-stone-700 tracking-wide leading-none uppercase')}
+          className={cn(fontSize, 'font-bold text-stone-700 tracking-wide leading-none uppercase text-center')}
           style={{ writingMode: 'vertical-rl', textOrientation: 'mixed', transform: 'rotate(180deg)' }}
         >
           {left}
         </span>
       </div>
 
-      {/* Rotate indicator (only when card is placed and rotatable) */}
+      {/* Rotate indicator */}
       {rotatable && (
         <div className="absolute inset-0 flex items-center justify-center">
           <RotateCw className="w-3.5 h-3.5 text-stone-400/40" />

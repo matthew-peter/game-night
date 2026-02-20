@@ -87,6 +87,7 @@ export interface CurrentGuess {
   rotations: number[];           // rotation per position (0–3)
   attempt: 1 | 2;
   firstAttemptResults: boolean[] | null;
+  driverSeat: number | null;     // seat of the player currently controlling the board
 }
 
 export interface SoCloverBoardState {
@@ -101,7 +102,7 @@ export interface SoCloverBoardState {
   roundScores: (number | null)[];    // score per spectator round
 }
 
-export type SoCloverMoveType = 'submit_clues' | 'place_cards' | 'submit_guess';
+export type SoCloverMoveType = 'submit_clues' | 'place_cards' | 'submit_guess' | 'take_control';
 
 export interface SubmitCluesData {
   clues: string[];

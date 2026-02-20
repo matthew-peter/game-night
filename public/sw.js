@@ -1,9 +1,8 @@
-// Service Worker for Web Push Notifications — v2
+// Service Worker for Web Push Notifications — v3
 //
 // Notification routing:
-// 1. User is on the SAME game page → suppress (real-time handles it)
-// 2. App is open but on a different page → show OS notification (user isn't watching that game)
-// 3. App is not open → show OS notification
+// 1. Any app window is visible → suppress entirely (real-time & in-app UI handle it)
+// 2. App is not visible (locked phone, minimised, etc.) → show OS notification
 
 self.addEventListener('push', function(event) {
   if (!event.data) return;
@@ -13,16 +12,12 @@ self.addEventListener('push', function(event) {
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
-      // Check if user is viewing the exact game page
       for (var i = 0; i < clientList.length; i++) {
-        var client = clientList[i];
-        if (client.visibilityState === 'visible' && gameId && client.url.includes('/game/' + gameId)) {
-          // User is looking at this game — real-time subscription handles updates
+        if (clientList[i].visibilityState === 'visible') {
           return;
         }
       }
 
-      // Show OS notification (user is either on a different page, or app is closed)
       var options = {
         body: data.body || "It's your turn!",
         icon: '/icon-192.png',

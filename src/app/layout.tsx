@@ -49,7 +49,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background h-full`}
       >
         {children}
-        <Toaster position="top-center" offset="4rem" />
+        <Toaster position="bottom-center" />
         <InAppNotifications />
       </body>
     </html>

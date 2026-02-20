@@ -134,15 +134,15 @@ export function ClueWritingPhase({
       </div>
 
       {/* Clue inputs — one per zone */}
-      <div className="space-y-2 px-1">
+      <div className="space-y-2.5 px-1">
         {ZONE_NAMES.map((name, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <div className="w-[7.5rem] shrink-0 text-right">
-              <span className={cn('text-[0.6rem] uppercase tracking-wider font-semibold', ZONE_COLORS[i])}>
+          <div key={i} className="flex flex-col gap-1">
+            <div className="flex items-center justify-center gap-1">
+              <span className={cn('text-[0.65rem] uppercase tracking-wider font-bold', ZONE_COLORS[i])}>
                 {zoneWordPairs[i][0]}
               </span>
-              <span className="text-[0.55rem] text-stone-500 mx-1">+</span>
-              <span className={cn('text-[0.6rem] uppercase tracking-wider font-semibold', ZONE_COLORS[i])}>
+              <span className="text-[0.55rem] text-stone-500">+</span>
+              <span className={cn('text-[0.65rem] uppercase tracking-wider font-bold', ZONE_COLORS[i])}>
                 {zoneWordPairs[i][1]}
               </span>
             </div>
@@ -155,7 +155,7 @@ export function ClueWritingPhase({
               }}
               placeholder={name}
               maxLength={30}
-              className="bg-stone-800/50 border-stone-600 text-white placeholder:text-stone-600 h-8 text-sm uppercase tracking-wide flex-1"
+              className="bg-stone-800/50 border-stone-600 text-white placeholder:text-stone-600 h-8 text-sm uppercase tracking-wide text-center"
             />
           </div>
         ))}

@@ -247,5 +247,6 @@ export function createFreshGuess(): CurrentGuess {
     rotations: [0, 0, 0, 0],
     attempt: 1,
     firstAttemptResults: null,
+    driverSeat: null,
   };
 }

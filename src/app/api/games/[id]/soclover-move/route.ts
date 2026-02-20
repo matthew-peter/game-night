@@ -122,6 +122,42 @@ export async function POST(
       return NextResponse.json({ success: true, phase: newPhase });
     }
 
+    // ── take_control ────────────────────────────────────────────────────
+    if (moveType === 'take_control') {
+      if (gameData.current_phase !== 'resolution') {
+        return NextResponse.json({ error: 'Not in resolution phase' }, { status: 400 });
+      }
+
+      const spectatorSeat = getCurrentSpectatorSeat(boardState);
+      if (seat === spectatorSeat) {
+        return NextResponse.json({ error: 'Spectator cannot take control' }, { status: 400 });
+      }
+
+      const updatedGuess = {
+        ...(boardState.currentGuess ?? createFreshGuess()),
+        driverSeat: seat,
+      };
+
+      const updatedBoardState: SoCloverBoardState = {
+        ...boardState,
+        currentGuess: updatedGuess,
+      };
+
+      const { data: updatedRow, error: updateError } = await supabase
+        .from('games')
+        .update({ board_state: updatedBoardState })
+        .eq('id', id)
+        .select('id')
+        .single();
+
+      if (updateError || !updatedRow) {
+        console.error('Error updating game:', updateError);
+        return NextResponse.json({ error: 'Failed to update game' }, { status: 500 });
+      }
+
+      return NextResponse.json({ success: true });
+    }
+
     // ── place_cards ───────────────────────────────────────────────────────
     if (moveType === 'place_cards') {
       if (gameData.current_phase !== 'resolution') {
@@ -131,6 +167,12 @@ export async function POST(
       const spectatorSeat = getCurrentSpectatorSeat(boardState);
       if (seat === spectatorSeat) {
         return NextResponse.json({ error: 'Spectator cannot place cards' }, { status: 400 });
+      }
+
+      // Only the current driver can place cards
+      const currentDriver = boardState.currentGuess?.driverSeat;
+      if (currentDriver != null && currentDriver !== seat) {
+        return NextResponse.json({ error: 'Another player is arranging — tap "Take Control" first' }, { status: 400 });
       }
 
       const { placements, rotations } = body;
@@ -143,6 +185,7 @@ export async function POST(
         ...(boardState.currentGuess ?? createFreshGuess()),
         placements,
         rotations,
+        driverSeat: seat,
       };
 
       const updatedBoardState: SoCloverBoardState = {
@@ -213,6 +256,7 @@ export async function POST(
           rotations: secondAttemptRotations,
           attempt: 2,
           firstAttemptResults: results,
+          driverSeat: null,
         };
       } else {
         const roundIdx = boardState.currentSpectatorIdx;

@@ -76,7 +76,7 @@ export function CloverBoard({
             : 'border-stone-600/30 bg-stone-800/20'
         )}
       >
-        <span className="text-[0.55rem] text-stone-500 uppercase">
+        <span className="text-[0.55rem] text-stone-500 uppercase text-center">
           {interactive ? 'Tap' : '—'}
         </span>
       </button>
@@ -88,14 +88,14 @@ export function CloverBoard({
     return (
       <div
         className={cn(
-          'rounded-full px-3 py-0.5 text-center whitespace-nowrap',
+          'rounded-full px-3 py-0.5 whitespace-nowrap flex items-center justify-center',
           clue
             ? 'bg-white/95 text-stone-800 shadow-sm'
             : 'bg-stone-700/40',
         )}
       >
         <span className={cn(
-          'font-bold uppercase tracking-wider',
+          'font-bold uppercase tracking-wider text-center',
           compact ? 'text-[0.5rem]' : 'text-[0.6rem]',
           !clue && 'text-stone-500 font-normal text-[0.5rem]'
         )}>
@@ -130,12 +130,12 @@ export function CloverBoard({
         </div>
 
         {/* Card grid 2×2 */}
-        <div className="flex flex-col gap-1">
-          <div className="flex gap-1 items-center">
+        <div className="flex flex-col gap-1 items-center">
+          <div className="flex gap-1 items-center justify-center">
             {renderCardSlot(0)}
             {renderCardSlot(1)}
           </div>
-          <div className="flex gap-1 items-center">
+          <div className="flex gap-1 items-center justify-center">
             {renderCardSlot(2)}
             {renderCardSlot(3)}
           </div>
