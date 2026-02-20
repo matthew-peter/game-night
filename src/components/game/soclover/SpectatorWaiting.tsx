@@ -21,7 +21,7 @@ export function SpectatorWaiting({
     .map(([, name]) => name);
 
   return (
-    <div className="flex flex-col items-center gap-4 p-4">
+    <div className="flex flex-col items-center justify-center gap-4 p-4 min-h-full">
       <div className="flex items-center gap-2 bg-green-800/60 rounded-full px-4 py-2">
         <Eye className="w-4 h-4 text-amber-400" />
         <span className="text-sm text-green-100">

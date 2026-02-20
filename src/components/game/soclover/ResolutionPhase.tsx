@@ -162,9 +162,7 @@ export function ResolutionPhase({
         toast.error(data.error || 'Failed to submit guess');
       } else {
         const data = await res.json();
-        if (data.score !== undefined && data.score !== -1) {
-          toast.success(`Round scored: ${data.score} points!`);
-        } else if (data.score === -1) {
+        if (data.score === -1) {
           toast.info('Not all correct — try again!');
         }
         onUpdated();
@@ -249,6 +247,7 @@ export function ResolutionPhase({
             r ? 'correct' : null
           ) ?? undefined}
           interactive={isDriver}
+          hasSelection={isDriver && selectedCard != null}
         />
       </div>
 
@@ -261,27 +260,29 @@ export function ResolutionPhase({
         onSelectCard={isDriver ? setSelectedCard : undefined}
       />
 
-      {/* Submit button — any non-spectator can submit */}
-      <div className="flex justify-center gap-2">
-        <Button
-          onClick={handleSubmitGuess}
-          disabled={!allPlaced || submitting}
-          size="sm"
-          className={cn(
-            'gap-2',
-            allPlaced
-              ? 'bg-green-600 hover:bg-green-500 text-white'
-              : 'bg-stone-700 text-stone-400'
-          )}
-        >
-          {submitting ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <CheckCircle className="w-4 h-4" />
-          )}
-          Submit Guess
-        </Button>
-      </div>
+      {/* Submit button — only the driver can submit */}
+      {isDriver && (
+        <div className="flex justify-center gap-2">
+          <Button
+            onClick={handleSubmitGuess}
+            disabled={!allPlaced || submitting}
+            size="sm"
+            className={cn(
+              'gap-2',
+              allPlaced
+                ? 'bg-green-600 hover:bg-green-500 text-white'
+                : 'bg-stone-700 text-stone-400'
+            )}
+          >
+            {submitting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <CheckCircle className="w-4 h-4" />
+            )}
+            Submit Guess
+          </Button>
+        </div>
+      )}
 
       {/* Round progress dots */}
       <div className="flex justify-center gap-1.5 mt-1">

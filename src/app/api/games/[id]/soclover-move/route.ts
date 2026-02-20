@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
-import { SoCloverBoardState, SoCloverMoveType } from '@/lib/game/soclover/types';
+import { SoCloverBoardState, SoCloverMoveType, RoundResult } from '@/lib/game/soclover/types';
 import {
   validateClues,
   getPlayerKeywords,
@@ -44,6 +44,9 @@ export async function POST(
     }
 
     if (gameData.status !== 'playing') {
+      if (moveType === 'acknowledge_result' && gameData.status === 'completed') {
+        return NextResponse.json({ success: true, gameComplete: true });
+      }
       return NextResponse.json({ error: 'Game is not in progress' }, { status: 400 });
     }
 
@@ -246,6 +249,7 @@ export async function POST(
       const updatedRoundScores = [...boardState.roundScores];
 
       if (score === -1) {
+        // First attempt failed — set up attempt 2
         const results = checkPlacements(spectatorClover, placements, rotations);
         const secondAttemptPlacements = placements.map(
           (p: number | null, i: number) => (results[i] ? p : null)
@@ -262,51 +266,28 @@ export async function POST(
           driverSeat: null,
           availableCardOrder: boardState.currentGuess.availableCardOrder,
         };
+        updatedBoardState.lastRoundResult = null;
       } else {
-        const roundIdx = boardState.currentSpectatorIdx;
-        updatedRoundScores[boardState.spectatorOrder[roundIdx]] = score;
+        // Round scored — store result for the overlay, don't advance yet
+        const results = checkPlacements(spectatorClover, placements, rotations);
+        updatedRoundScores[boardState.spectatorOrder[boardState.currentSpectatorIdx]] = score;
         updatedBoardState.roundScores = updatedRoundScores;
         updatedBoardState.clovers = [...boardState.clovers];
-        updatedBoardState.clovers[spectatorSeat!] = {
-          ...spectatorClover,
+        updatedBoardState.clovers[spectatorSeat!] = { ...spectatorClover, score };
+        updatedBoardState.currentGuess = null;
+
+        const roundResult: RoundResult = {
+          spectatorSeat: spectatorSeat!,
           score,
+          correctPlacements: results,
+          guessPlacements: placements,
+          guessRotations: rotations,
+          actualCardIndices: [...spectatorClover.cardIndices],
+          actualRotations: [...spectatorClover.rotations],
+          attempt: guess.attempt as 1 | 2,
+          acknowledged: [],
         };
-
-        if (allRoundsComplete({ ...updatedBoardState, roundScores: updatedRoundScores })) {
-          const totalScore = computeTotalScore(updatedRoundScores);
-          const maxScore = boardState.clovers.length * 6;
-          updatedBoardState.currentGuess = null;
-
-          const { data: updatedRow, error: updateError } = await supabase
-            .from('games')
-            .update({
-              board_state: updatedBoardState,
-              status: 'completed',
-              result: totalScore >= Math.ceil(maxScore * 0.5) ? 'win' : 'loss',
-              ended_at: new Date().toISOString(),
-            })
-            .eq('id', id)
-            .select('id')
-            .single();
-
-          if (updateError || !updatedRow) {
-            console.error('Error updating game:', updateError);
-            return NextResponse.json({ error: 'Failed to update game' }, { status: 500 });
-          }
-
-          await supabase.from('moves').insert({
-            game_id: id,
-            player_id: user.id,
-            move_type: 'submit_guess',
-            move_data: { placements, rotations, score, totalScore, gameComplete: true },
-          });
-
-          return NextResponse.json({ success: true, score, totalScore, gameComplete: true });
-        } else {
-          updatedBoardState.currentSpectatorIdx = boardState.currentSpectatorIdx + 1;
-          const nextSpectator = updatedBoardState.spectatorOrder[updatedBoardState.currentSpectatorIdx];
-          updatedBoardState.currentGuess = createFreshGuess(updatedBoardState, nextSpectator);
-        }
+        updatedBoardState.lastRoundResult = roundResult;
       }
 
       const { data: updatedRow, error: updateError } = await supabase
@@ -329,6 +310,77 @@ export async function POST(
       });
 
       return NextResponse.json({ success: true, score });
+    }
+
+    // ── acknowledge_result ────────────────────────────────────────────────
+    if (moveType === 'acknowledge_result') {
+      if (gameData.current_phase !== 'resolution') {
+        return NextResponse.json({ error: 'Not in resolution phase' }, { status: 400 });
+      }
+
+      const result = boardState.lastRoundResult;
+      if (!result) {
+        return NextResponse.json({ error: 'No result to acknowledge' }, { status: 400 });
+      }
+
+      const acknowledged = new Set(result.acknowledged);
+      acknowledged.add(seat);
+
+      const totalPlayers = gameData.game_players?.length ?? 0;
+      const allAcked = acknowledged.size >= totalPlayers;
+
+      const updatedBoardState: SoCloverBoardState = { ...boardState };
+
+      if (allAcked) {
+        updatedBoardState.lastRoundResult = null;
+
+        const updatedRoundScores = [...updatedBoardState.roundScores];
+        if (allRoundsComplete({ ...updatedBoardState, roundScores: updatedRoundScores })) {
+          const totalScore = computeTotalScore(updatedRoundScores);
+          const maxScore = boardState.clovers.length * 6;
+          updatedBoardState.currentGuess = null;
+
+          const { data: updatedRow, error: updateError } = await supabase
+            .from('games')
+            .update({
+              board_state: updatedBoardState,
+              status: 'completed',
+              result: totalScore >= Math.ceil(maxScore * 0.5) ? 'win' : 'loss',
+              ended_at: new Date().toISOString(),
+            })
+            .eq('id', id)
+            .select('id')
+            .single();
+
+          if (updateError || !updatedRow) {
+            return NextResponse.json({ error: 'Failed to update game' }, { status: 500 });
+          }
+
+          return NextResponse.json({ success: true, gameComplete: true });
+        } else {
+          updatedBoardState.currentSpectatorIdx = boardState.currentSpectatorIdx + 1;
+          const nextSpectator = updatedBoardState.spectatorOrder[updatedBoardState.currentSpectatorIdx];
+          updatedBoardState.currentGuess = createFreshGuess(updatedBoardState, nextSpectator);
+        }
+      } else {
+        updatedBoardState.lastRoundResult = {
+          ...result,
+          acknowledged: [...acknowledged],
+        };
+      }
+
+      const { data: updatedRow, error: updateError } = await supabase
+        .from('games')
+        .update({ board_state: updatedBoardState })
+        .eq('id', id)
+        .select('id')
+        .single();
+
+      if (updateError || !updatedRow) {
+        return NextResponse.json({ error: 'Failed to update game' }, { status: 500 });
+      }
+
+      return NextResponse.json({ success: true });
     }
 
     return NextResponse.json({ error: 'Invalid move type' }, { status: 400 });

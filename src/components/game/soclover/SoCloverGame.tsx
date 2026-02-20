@@ -8,6 +8,7 @@ import { ClueWritingPhase } from './ClueWritingPhase';
 import { ResolutionPhase } from './ResolutionPhase';
 import { SpectatorWaiting } from './SpectatorWaiting';
 import { SoCloverReview } from './SoCloverReview';
+import { RoundResultOverlay } from './RoundResultOverlay';
 import { Game, Seat, GamePlayer, getOtherPlayers } from '@/lib/supabase/types';
 import { SoCloverBoardState } from '@/lib/game/soclover/types';
 import { getCurrentSpectatorSeat } from '@/lib/game/soclover/logic';
@@ -75,6 +76,7 @@ export function SoCloverGame({
   const isResolution = game.current_phase === 'resolution';
   const roundIdx = boardState.currentSpectatorIdx;
   const totalRounds = boardState.spectatorOrder.length;
+  const showRoundResult = isResolution && boardState.lastRoundResult != null;
 
   return (
     <div className="game-viewport fixed inset-0 bg-gradient-to-b from-green-900 via-emerald-800 to-green-950 flex flex-col overflow-hidden">
@@ -136,7 +138,18 @@ export function SoCloverGame({
           />
         )}
 
-        {isResolution && isSpectator && (
+        {showRoundResult && (
+          <RoundResultOverlay
+            boardState={boardState}
+            result={boardState.lastRoundResult!}
+            mySeat={mySeat}
+            gameId={game.id}
+            playerNames={playerNames}
+            totalPlayers={players.length}
+          />
+        )}
+
+        {isResolution && !showRoundResult && isSpectator && (
           <SpectatorWaiting
             boardState={boardState}
             mySeat={mySeat}
@@ -144,7 +157,7 @@ export function SoCloverGame({
           />
         )}
 
-        {isResolution && !isSpectator && (
+        {isResolution && !showRoundResult && !isSpectator && (
           <ResolutionPhase
             boardState={boardState}
             mySeat={mySeat}

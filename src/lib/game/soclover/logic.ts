@@ -92,6 +92,7 @@ export function createInitialBoardState(
     currentSpectatorIdx: -1,
     currentGuess: null,
     roundScores: new Array(playerCount).fill(null),
+    lastRoundResult: null,
   };
 }
 

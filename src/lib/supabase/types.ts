@@ -13,7 +13,7 @@ export type Seat = number;
 
 export type GameType = 'codenames' | 'scrabble' | 'so_clover';
 export type GameStatus = 'waiting' | 'playing' | 'completed' | 'abandoned';
-export type MoveType = 'clue' | 'guess' | 'end_turn' | 'place_tiles' | 'exchange_tiles' | 'pass' | 'submit_clues' | 'place_cards' | 'submit_guess' | 'take_control';
+export type MoveType = 'clue' | 'guess' | 'end_turn' | 'place_tiles' | 'exchange_tiles' | 'pass' | 'submit_clues' | 'place_cards' | 'submit_guess' | 'take_control' | 'acknowledge_result';
 export type CardType = 'agent' | 'bystander' | 'assassin';
 export type ClueStrictness = 'basic' | 'strict' | 'very_strict';
 

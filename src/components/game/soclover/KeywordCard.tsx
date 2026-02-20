@@ -46,25 +46,27 @@ export function KeywordCard({
     <div
       onClick={handleClick}
       className={cn(
-        'relative rounded-xl border-2 select-none transition-all duration-200 flex-shrink-0',
+        'relative rounded-xl border-2 select-none flex-shrink-0',
+        'transition-all duration-300 ease-out',
         cardSize,
-        (onSelect) && 'cursor-pointer active:scale-95',
-        selected && 'ring-2 ring-white shadow-white/30 shadow-lg scale-105',
-        highlight === 'correct' && 'ring-2 ring-emerald-400 shadow-emerald-400/30 shadow-lg',
-        highlight === 'incorrect' && 'ring-2 ring-red-400 shadow-red-400/30 shadow-lg',
+        onSelect && 'cursor-pointer',
+        selected && 'ring-2 ring-white shadow-[0_0_16px_rgba(255,255,255,0.3)] scale-110 -translate-y-1',
+        !selected && onSelect && 'hover:scale-105 active:scale-95',
+        highlight === 'correct' && 'ring-2 ring-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.4)]',
+        highlight === 'incorrect' && 'ring-2 ring-red-400 shadow-[0_0_12px_rgba(248,113,113,0.4)]',
         dimmed ? 'opacity-40' : 'opacity-100',
         'bg-gradient-to-br from-amber-50 to-amber-200 border-amber-400/70',
         className
       )}
     >
-      {/* Top word — centered horizontally at top edge */}
+      {/* Top word */}
       <div className="absolute top-0.5 inset-x-0 flex justify-center">
         <span className={cn(fontSize, 'font-bold text-stone-700 tracking-wide leading-none uppercase text-center truncate max-w-[80%]')}>
           {top}
         </span>
       </div>
 
-      {/* Right word — centered vertically at right edge */}
+      {/* Right word */}
       <div className="absolute inset-y-0 right-0 flex items-center justify-center w-3">
         <span
           className={cn(fontSize, 'font-bold text-stone-700 tracking-wide leading-none uppercase text-center')}
@@ -74,14 +76,14 @@ export function KeywordCard({
         </span>
       </div>
 
-      {/* Bottom word — centered horizontally at bottom edge */}
+      {/* Bottom word */}
       <div className="absolute bottom-0.5 inset-x-0 flex justify-center">
         <span className={cn(fontSize, 'font-bold text-stone-700 tracking-wide leading-none uppercase text-center truncate max-w-[80%]')}>
           {bottom}
         </span>
       </div>
 
-      {/* Left word — centered vertically at left edge */}
+      {/* Left word */}
       <div className="absolute inset-y-0 left-0 flex items-center justify-center w-3">
         <span
           className={cn(fontSize, 'font-bold text-stone-700 tracking-wide leading-none uppercase text-center')}

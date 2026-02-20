@@ -15,6 +15,7 @@ interface CloverBoardProps {
   highlights?: ('correct' | 'incorrect' | null)[];
   interactive?: boolean;
   compact?: boolean;
+  hasSelection?: boolean;
 }
 
 const ZONE_LABELS = ['TOP', 'RIGHT', 'BOTTOM', 'LEFT'];
@@ -30,6 +31,7 @@ export function CloverBoard({
   highlights,
   interactive = false,
   compact = false,
+  hasSelection = false,
 }: CloverBoardProps) {
   const slotSize = compact
     ? 'w-[4.75rem] h-[4.75rem]'
@@ -43,7 +45,7 @@ export function CloverBoard({
 
     if (hasCard) {
       return (
-        <div className="relative group">
+        <div className="relative group animate-in fade-in zoom-in-95 duration-200">
           <KeywordCard
             words={cards[cardIdx]}
             rotation={rotations[position]}
@@ -55,8 +57,9 @@ export function CloverBoard({
           {interactive && (
             <button
               onClick={(e) => { e.stopPropagation(); onRemove?.(position); }}
-              className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500/90 text-white text-xs
-                         flex items-center justify-center shadow-md hover:bg-red-400 z-10"
+              className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500/90 text-white text-xs
+                         flex items-center justify-center shadow-md hover:bg-red-400 z-10
+                         transition-transform hover:scale-110 active:scale-90"
             >
               ×
             </button>
@@ -65,19 +68,25 @@ export function CloverBoard({
       );
     }
 
+    const slotReady = interactive && hasSelection;
     return (
       <button
         onClick={() => interactive && onSlotTap?.(position)}
         className={cn(
           slotSize,
-          'rounded-xl border-2 border-dashed flex items-center justify-center transition-all',
-          interactive
-            ? 'border-emerald-400/50 bg-emerald-950/30 hover:bg-emerald-900/50 hover:border-emerald-300/60 active:scale-95 cursor-pointer'
-            : 'border-stone-600/30 bg-stone-800/20'
+          'rounded-xl border-2 border-dashed flex items-center justify-center transition-all duration-300',
+          slotReady
+            ? 'border-emerald-400 bg-emerald-900/40 shadow-[0_0_12px_rgba(16,185,129,0.25)] animate-pulse cursor-pointer active:scale-95'
+            : interactive
+              ? 'border-emerald-400/50 bg-emerald-950/30 hover:bg-emerald-900/50 hover:border-emerald-300/60 active:scale-95 cursor-pointer'
+              : 'border-stone-600/30 bg-stone-800/20'
         )}
       >
-        <span className="text-[0.55rem] text-stone-500 uppercase text-center">
-          {interactive ? 'Tap' : '—'}
+        <span className={cn(
+          'text-[0.55rem] uppercase text-center transition-colors',
+          slotReady ? 'text-emerald-300 font-medium' : 'text-stone-500'
+        )}>
+          {slotReady ? '↓ Place' : interactive ? 'Tap' : '—'}
         </span>
       </button>
     );

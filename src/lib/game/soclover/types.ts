@@ -91,6 +91,18 @@ export interface CurrentGuess {
   availableCardOrder: number[];  // shuffled once at round start, stable across re-renders
 }
 
+export interface RoundResult {
+  spectatorSeat: number;
+  score: number;
+  correctPlacements: boolean[];      // which positions were correct
+  guessPlacements: (number | null)[];
+  guessRotations: number[];
+  actualCardIndices: number[];       // the correct card arrangement
+  actualRotations: number[];         // the correct rotations
+  attempt: 1 | 2;
+  acknowledged: number[];            // seats that have seen the result
+}
+
 export interface SoCloverBoardState {
   keywordCards: KeywordCardWords[];  // all keyword cards generated for this game
   clovers: PlayerClover[];           // indexed by seat
@@ -101,9 +113,10 @@ export interface SoCloverBoardState {
 
   currentGuess: CurrentGuess | null;
   roundScores: (number | null)[];    // score per spectator round
+  lastRoundResult: RoundResult | null;
 }
 
-export type SoCloverMoveType = 'submit_clues' | 'place_cards' | 'submit_guess' | 'take_control';
+export type SoCloverMoveType = 'submit_clues' | 'place_cards' | 'submit_guess' | 'take_control' | 'acknowledge_result';
 
 export interface SubmitCluesData {
   clues: string[];

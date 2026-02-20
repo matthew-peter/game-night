@@ -34,6 +34,12 @@ export function SoCloverReview({
 
   const currentClover = boardState.clovers[viewingClover];
   const currentName = playerNames.get(viewingClover) ?? `Player ${viewingClover + 1}`;
+  const numClovers = boardState.clovers.length;
+
+  const prevClover = () =>
+    setViewingClover((viewingClover - 1 + numClovers) % numClovers);
+  const nextClover = () =>
+    setViewingClover((viewingClover + 1) % numClovers);
 
   return (
     <div
@@ -91,45 +97,59 @@ export function SoCloverReview({
             maxScore={maxScore}
           />
         ) : (
-          <div className="flex flex-col items-center gap-3 w-full max-w-sm">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() =>
-                  setViewingClover(
-                    (viewingClover - 1 + boardState.clovers.length) %
-                      boardState.clovers.length
-                  )
-                }
+          <div className="flex flex-col items-center gap-4 w-full max-w-sm">
+            {/* Navigation */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={prevClover}
+                className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 active:bg-white/30 flex items-center justify-center transition-colors"
               >
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              <span className="text-sm font-medium text-white min-w-[120px] text-center">
-                {currentName}&apos;s Clover
+                <ChevronLeft className="w-5 h-5 text-white" />
+              </button>
+              <div className="text-center min-w-[140px]">
+                <span className="text-sm font-semibold text-white">
+                  {currentName}
+                </span>
                 {currentClover.score !== null && (
-                  <span className="text-amber-400 ml-1">({currentClover.score} pts)</span>
+                  <span className="text-amber-400 text-sm font-bold ml-1.5">
+                    {currentClover.score} pts
+                  </span>
                 )}
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() =>
-                  setViewingClover(
-                    (viewingClover + 1) % boardState.clovers.length
-                  )
-                }
+                <p className="text-[0.6rem] text-stone-400 mt-0.5">
+                  {viewingClover + 1} of {numClovers}
+                </p>
+              </div>
+              <button
+                onClick={nextClover}
+                className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 active:bg-white/30 flex items-center justify-center transition-colors"
               >
-                <ChevronRight className="w-4 h-4" />
-              </Button>
+                <ChevronRight className="w-5 h-5 text-white" />
+              </button>
             </div>
 
+            {/* Clover board */}
             <CloverBoard
               cards={boardState.keywordCards}
               placements={currentClover.cardIndices}
               rotations={currentClover.rotations}
               clues={currentClover.clues}
             />
+
+            {/* Dot indicators */}
+            <div className="flex gap-1.5">
+              {boardState.clovers.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setViewingClover(i)}
+                  className={cn(
+                    'w-2.5 h-2.5 rounded-full transition-all',
+                    i === viewingClover
+                      ? 'bg-green-400 scale-125'
+                      : 'bg-white/20 hover:bg-white/40'
+                  )}
+                />
+              ))}
+            </div>
           </div>
         )}
       </div>
