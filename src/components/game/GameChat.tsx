@@ -218,6 +218,7 @@ export function GameChat({
     };
     setMessages((prev) => [...prev, optimisticMsg]);
     setMessage('');
+    setIsOpen(false);
 
     const { data, error } = await supabase
       .from('chat_messages')
