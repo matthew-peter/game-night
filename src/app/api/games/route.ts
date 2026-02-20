@@ -24,7 +24,8 @@ export async function POST(request: Request) {
 
     if (gameType === 'so_clover') {
       const maxPlayers = Math.min(Math.max(body.maxPlayers ?? 3, 3), 6);
-      const boardState = createSoCloverBoardState(maxPlayers);
+      const decoyCount = Math.min(Math.max(body.decoyCount ?? 1, 0), 3);
+      const boardState = createSoCloverBoardState(maxPlayers, decoyCount);
 
       gameInsert = {
         game_type: 'so_clover',

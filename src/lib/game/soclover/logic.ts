@@ -31,12 +31,14 @@ function randomRotation(): number {
 
 /**
  * Generate keyword cards for a game. Each card has 4 words (one per edge).
- * We need 5 cards per player (4 real + 1 decoy).
+ * We need (4 + decoyCount) cards per player.
  */
 export function generateKeywordCards(
-  playerCount: number
+  playerCount: number,
+  decoyCount: number
 ): KeywordCardWords[] {
-  const cardsNeeded = playerCount * 5;
+  const cardsPerPlayer = 4 + decoyCount;
+  const cardsNeeded = playerCount * cardsPerPlayer;
   const wordsNeeded = cardsNeeded * 4;
 
   const shuffled = shuffle(KEYWORDS).slice(0, wordsNeeded);
@@ -50,20 +52,27 @@ export function generateKeywordCards(
 /**
  * Build the initial board state for a new So Clover game.
  */
-export function createInitialBoardState(playerCount: number): SoCloverBoardState {
-  const cards = generateKeywordCards(playerCount);
+export function createInitialBoardState(
+  playerCount: number,
+  decoyCount: number = 1
+): SoCloverBoardState {
+  const cards = generateKeywordCards(playerCount, decoyCount);
 
   const clovers: PlayerClover[] = [];
+  const cardsPerPlayer = 4 + decoyCount;
   let cardIdx = 0;
 
   for (let seat = 0; seat < playerCount; seat++) {
     const cardIndices = [cardIdx, cardIdx + 1, cardIdx + 2, cardIdx + 3];
-    const decoyCardIndex = cardIdx + 4;
-    cardIdx += 5;
+    const decoyCardIndices: number[] = [];
+    for (let d = 0; d < decoyCount; d++) {
+      decoyCardIndices.push(cardIdx + 4 + d);
+    }
+    cardIdx += cardsPerPlayer;
 
     clovers.push({
       cardIndices,
-      decoyCardIndex,
+      decoyCardIndices,
       clues: [null, null, null, null],
       cluesSubmitted: false,
       rotations: [randomRotation(), randomRotation(), randomRotation(), randomRotation()],
@@ -78,6 +87,7 @@ export function createInitialBoardState(playerCount: number): SoCloverBoardState
   return {
     keywordCards: cards,
     clovers,
+    decoyCount,
     spectatorOrder,
     currentSpectatorIdx: -1,
     currentGuess: null,
@@ -87,10 +97,6 @@ export function createInitialBoardState(playerCount: number): SoCloverBoardState
 
 // ── Clue validation ─────────────────────────────────────────────────────────
 
-/**
- * Validate that clues are legal: single word, not empty, not one of the
- * player's 16 keywords (4 cards × 4 words).
- */
 export function validateClues(
   clues: string[],
   playerKeywords: string[]
@@ -116,9 +122,6 @@ export function validateClues(
   return { valid: true };
 }
 
-/**
- * Get all 16 keywords from a player's clover (4 cards × 4 words).
- */
 export function getPlayerKeywords(
   boardState: SoCloverBoardState,
   seat: number
@@ -133,13 +136,6 @@ export function getPlayerKeywords(
 
 // ── Zone word computation ───────────────────────────────────────────────────
 
-/**
- * Get the two words facing a given zone based on card placements and rotations.
- *
- * Each zone is defined by two (position, edge) pairs in ZONE_CONTRIBUTIONS.
- * For a card at a given position with a given rotation, the word at a
- * specific edge is: words[(edge - rotation + 4) % 4]
- */
 export function getWordsForZone(
   cards: KeywordCardWords[],
   placements: (number | null)[],
@@ -161,9 +157,6 @@ export function getWordsForZone(
   return [results[0], results[1]];
 }
 
-/**
- * Convenience: get zone words for a player's own clover (used in clue writing).
- */
 export function getZoneWordsForClover(
   boardState: SoCloverBoardState,
   seat: number,
@@ -180,11 +173,6 @@ export function getZoneWordsForClover(
 
 // ── Scoring ─────────────────────────────────────────────────────────────────
 
-/**
- * Compare a guess placement against the original clover.
- * A position is correct if the same card is placed there AND the same
- * rotation is applied (so the same words face the same zones).
- */
 export function checkPlacements(
   originalClover: PlayerClover,
   guessPlacements: (number | null)[],
@@ -197,12 +185,6 @@ export function checkPlacements(
   });
 }
 
-/**
- * Compute the score for a resolution round.
- * - First attempt, all 4 correct: 6 points
- * - Second attempt: 1 point per correct position (0–4)
- * Returns -1 to signal "go to attempt 2" on a failed first attempt.
- */
 export function computeRoundScore(
   originalClover: PlayerClover,
   guess: CurrentGuess,
@@ -248,15 +230,15 @@ export function getCurrentSpectatorSeat(
 }
 
 /**
- * Get the 5 card indices available for guessing during a resolution round:
- * the 4 real cards + 1 decoy, shuffled.
+ * Get the card indices available for guessing during a resolution round:
+ * the 4 real cards + N decoy cards, shuffled.
  */
 export function getResolutionCardIndices(
   boardState: SoCloverBoardState,
   spectatorSeat: number
 ): number[] {
   const clover = boardState.clovers[spectatorSeat];
-  return shuffle([...clover.cardIndices, clover.decoyCardIndex]);
+  return shuffle([...clover.cardIndices, ...clover.decoyCardIndices]);
 }
 
 export function createFreshGuess(): CurrentGuess {

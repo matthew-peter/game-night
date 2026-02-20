@@ -50,6 +50,7 @@ function DashboardContent() {
   const [scrabbleMaxPlayers, setScrabbleMaxPlayers] = useState(2);
   const [scrabbleDictionaryMode, setScrabbleDictionaryMode] = useState<'strict' | 'friendly' | 'off'>('friendly');
   const [soCloverMaxPlayers, setSoCloverMaxPlayers] = useState(4);
+  const [soCloverDecoyCount, setSoCloverDecoyCount] = useState(1);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   // Fetch active games
@@ -187,7 +188,7 @@ function DashboardContent() {
 
       if (gameType === 'so_clover') {
         const maxPlayers = soCloverMaxPlayers;
-        const boardState = createSoCloverBoardState(maxPlayers);
+        const boardState = createSoCloverBoardState(maxPlayers, soCloverDecoyCount);
 
         gameInsert = {
           id: gameId,
@@ -698,6 +699,25 @@ function DashboardContent() {
                           />
                           <p className="text-xs text-stone-500">
                             Cooperative word-association game. Everyone writes clues, then the team guesses together.
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Hidden Cards: {soCloverDecoyCount}</Label>
+                          <Slider
+                            value={[soCloverDecoyCount]}
+                            onValueChange={(v) => setSoCloverDecoyCount(v[0])}
+                            min={0}
+                            max={3}
+                            step={1}
+                            className="w-full"
+                          />
+                          <p className="text-xs text-stone-500">
+                            {soCloverDecoyCount === 0
+                              ? 'No decoys — easier, great for learning.'
+                              : soCloverDecoyCount === 1
+                                ? 'Standard: 1 decoy card mixed in with the 4 real cards.'
+                                : `${soCloverDecoyCount} decoy cards — harder!`}
                           </p>
                         </div>
                       </div>

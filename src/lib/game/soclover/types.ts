@@ -75,7 +75,7 @@ export function getRotatedWords(
 
 export interface PlayerClover {
   cardIndices: number[];       // 4 indices into keywordCards
-  decoyCardIndex: number;      // 5th decoy card index
+  decoyCardIndices: number[];  // 0+ decoy card indices (default 1)
   clues: (string | null)[];    // 4 clues, indexed by zone (top, right, bottom, left)
   cluesSubmitted: boolean;
   rotations: number[];         // 4 rotation values (0–3), one per card position
@@ -92,6 +92,7 @@ export interface CurrentGuess {
 export interface SoCloverBoardState {
   keywordCards: KeywordCardWords[];  // all keyword cards generated for this game
   clovers: PlayerClover[];           // indexed by seat
+  decoyCount: number;                // number of decoy cards per player (0, 1, 2, …)
 
   spectatorOrder: number[];          // seat order for resolution rounds
   currentSpectatorIdx: number;       // -1 = clue_writing phase, 0+ = resolution round index

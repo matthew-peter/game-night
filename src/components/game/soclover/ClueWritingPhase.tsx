@@ -14,15 +14,23 @@ interface ClueWritingPhaseProps {
   boardState: SoCloverBoardState;
   mySeat: number;
   gameId: string;
+  playerNames: Map<number, string>;
   onSubmitted: () => void;
 }
 
 const ZONE_NAMES = ['TOP', 'RIGHT', 'BOTTOM', 'LEFT'];
+const ZONE_COLORS = [
+  'text-sky-400/80',
+  'text-rose-400/80',
+  'text-amber-400/80',
+  'text-violet-400/80',
+];
 
 export function ClueWritingPhase({
   boardState,
   mySeat,
   gameId,
+  playerNames,
   onSubmitted,
 }: ClueWritingPhaseProps) {
   const clover = boardState.clovers[mySeat];
@@ -79,80 +87,95 @@ export function ClueWritingPhase({
       <div className="flex flex-col items-center justify-center gap-4 p-6">
         <div className="flex items-center gap-2 text-emerald-400">
           <Check className="w-5 h-5" />
-          <span className="font-medium">Your clues are submitted!</span>
+          <span className="font-medium">Clues submitted!</span>
         </div>
         <p className="text-sm text-stone-400 text-center">
-          Waiting for other players to finish writing...
+          Waiting for others to finish writing...
         </p>
         <div className="flex flex-wrap gap-2 justify-center">
-          {otherPlayersStatus.map(({ seat, submitted }) => (
-            <div
-              key={seat}
-              className={cn(
-                'px-3 py-1 rounded-full text-xs font-medium',
-                submitted
-                  ? 'bg-emerald-900/50 text-emerald-400'
-                  : 'bg-stone-700/50 text-stone-400'
-              )}
-            >
-              Player {seat + 1} {submitted ? '✓' : '...'}
-            </div>
-          ))}
+          {otherPlayersStatus.map(({ seat, submitted }) => {
+            const name = playerNames.get(seat) ?? `Player ${seat + 1}`;
+            return (
+              <div
+                key={seat}
+                className={cn(
+                  'px-3 py-1 rounded-full text-xs font-medium',
+                  submitted
+                    ? 'bg-emerald-900/50 text-emerald-400'
+                    : 'bg-stone-700/50 text-stone-400'
+                )}
+              >
+                {name} {submitted ? '✓' : '...'}
+              </div>
+            );
+          })}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-4 p-3">
+    <div className="flex flex-col gap-3 p-3">
       <div className="text-center">
-        <h2 className="text-lg font-bold text-white">Write Your Clues</h2>
-        <p className="text-sm text-stone-400">
-          One word per zone — connect the two keywords that face each other
+        <h2 className="text-base font-bold text-white">Write Your Clues</h2>
+        <p className="text-xs text-stone-400 mt-0.5">
+          One word per zone — connect the two keywords facing each other
         </p>
       </div>
 
-      <CloverBoard
-        cards={boardState.keywordCards}
-        placements={clover.cardIndices}
-        rotations={clover.rotations}
-        clues={clues.map((c) => c || null)}
-        compact
-      />
+      <div className="flex justify-center">
+        <CloverBoard
+          cards={boardState.keywordCards}
+          placements={clover.cardIndices}
+          rotations={clover.rotations}
+          clues={clues.map((c) => c || null)}
+          compact
+        />
+      </div>
 
-      <div className="grid grid-cols-2 gap-3 px-2">
+      {/* Clue inputs — one per zone */}
+      <div className="space-y-2 px-1">
         {ZONE_NAMES.map((name, i) => (
-          <div key={i} className="flex flex-col gap-1">
-            <label className="text-[0.6rem] uppercase tracking-widest text-emerald-400/70 font-medium">
-              {name}: {zoneWordPairs[i][0]} + {zoneWordPairs[i][1]}
-            </label>
+          <div key={i} className="flex items-center gap-2">
+            <div className="w-[7.5rem] shrink-0 text-right">
+              <span className={cn('text-[0.6rem] uppercase tracking-wider font-semibold', ZONE_COLORS[i])}>
+                {zoneWordPairs[i][0]}
+              </span>
+              <span className="text-[0.55rem] text-stone-500 mx-1">+</span>
+              <span className={cn('text-[0.6rem] uppercase tracking-wider font-semibold', ZONE_COLORS[i])}>
+                {zoneWordPairs[i][1]}
+              </span>
+            </div>
             <Input
               value={clues[i]}
               onChange={(e) => {
                 const next = [...clues];
-                next[i] = e.target.value.replace(/\s/g, '');
+                next[i] = e.target.value.replace(/\s/g, '').toUpperCase();
                 setClues(next);
               }}
-              placeholder="One word..."
+              placeholder={name}
               maxLength={30}
-              className="bg-stone-800/50 border-stone-600 text-white placeholder:text-stone-500 h-9 text-sm"
+              className="bg-stone-800/50 border-stone-600 text-white placeholder:text-stone-600 h-8 text-sm uppercase tracking-wide flex-1"
             />
           </div>
         ))}
       </div>
 
-      <Button
-        onClick={handleSubmit}
-        disabled={submitting || clues.some((c) => !c.trim())}
-        className="mx-auto bg-emerald-600 hover:bg-emerald-500 text-white gap-2"
-      >
-        {submitting ? (
-          <Loader2 className="w-4 h-4 animate-spin" />
-        ) : (
-          <Send className="w-4 h-4" />
-        )}
-        Submit Clues
-      </Button>
+      <div className="flex justify-center">
+        <Button
+          onClick={handleSubmit}
+          disabled={submitting || clues.some((c) => !c.trim())}
+          size="sm"
+          className="bg-emerald-600 hover:bg-emerald-500 text-white gap-2"
+        >
+          {submitting ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Send className="w-4 h-4" />
+          )}
+          Submit Clues
+        </Button>
+      </div>
     </div>
   );
 }

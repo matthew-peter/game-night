@@ -9,7 +9,7 @@ import { Game, GamePlayer } from '@/lib/supabase/types';
 import { Header } from '@/components/shared/Header';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Trophy, ChevronLeft, ChevronRight, Clover } from 'lucide-react';
+import { Trophy, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface SoCloverReviewProps {
   game: Game;
@@ -40,7 +40,7 @@ export function SoCloverReview({
       className={cn(
         'fixed inset-0 overflow-y-auto game-scroll-area',
         won
-          ? 'bg-gradient-to-b from-emerald-900 to-emerald-950'
+          ? 'bg-gradient-to-b from-green-800 to-green-950'
           : 'bg-gradient-to-b from-stone-800 to-stone-950'
       )}
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
@@ -48,15 +48,10 @@ export function SoCloverReview({
       <Header />
 
       <div className="flex flex-col items-center px-4 py-6 gap-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
-        {/* Hero */}
         <div className="flex flex-col items-center gap-2">
-          <Clover className={cn(
-            'w-10 h-10',
-            won ? 'text-emerald-400' : 'text-stone-500'
-          )} />
           <h1 className={cn(
             'text-2xl font-bold',
-            won ? 'text-emerald-300' : 'text-stone-300'
+            won ? 'text-green-300' : 'text-stone-300'
           )}>
             {won ? 'Great Teamwork!' : 'Game Over'}
           </h1>
@@ -68,13 +63,12 @@ export function SoCloverReview({
           </div>
         </div>
 
-        {/* Toggle */}
         <div className="flex gap-2">
           <Button
             variant={showScores ? 'default' : 'outline'}
             size="sm"
             onClick={() => setShowScores(true)}
-            className={showScores ? 'bg-emerald-600 hover:bg-emerald-500' : ''}
+            className={showScores ? 'bg-green-600 hover:bg-green-500' : ''}
           >
             Scores
           </Button>
@@ -82,7 +76,7 @@ export function SoCloverReview({
             variant={!showScores ? 'default' : 'outline'}
             size="sm"
             onClick={() => setShowScores(false)}
-            className={!showScores ? 'bg-emerald-600 hover:bg-emerald-500' : ''}
+            className={!showScores ? 'bg-green-600 hover:bg-green-500' : ''}
           >
             View Clovers
           </Button>
@@ -111,7 +105,7 @@ export function SoCloverReview({
               >
                 <ChevronLeft className="w-4 h-4" />
               </Button>
-              <span className="text-sm font-medium text-white min-w-[100px] text-center">
+              <span className="text-sm font-medium text-white min-w-[120px] text-center">
                 {currentName}&apos;s Clover
                 {currentClover.score !== null && (
                   <span className="text-amber-400 ml-1">({currentClover.score} pts)</span>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo, useRef } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { CloverBoard } from './CloverBoard';
 import { CardTray } from './CardTray';
@@ -30,12 +30,12 @@ export function ResolutionPhase({
   const guess = boardState.currentGuess;
 
   const [submitting, setSubmitting] = useState(false);
-  const dragCardRef = useRef<number | null>(null);
+  const [selectedCard, setSelectedCard] = useState<number | null>(null);
 
   const availableCardIndices = useMemo(
     () => getResolutionCardIndices(boardState, spectatorSeat),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [spectatorSeat, spectatorClover.cardIndices, spectatorClover.decoyCardIndex]
+    [spectatorSeat, spectatorClover.cardIndices, JSON.stringify(spectatorClover.decoyCardIndices)]
   );
 
   const placements = guess?.placements ?? [null, null, null, null];
@@ -60,38 +60,33 @@ export function ResolutionPhase({
     }
   }, [gameId]);
 
-  const handleDragStart = useCallback((cardIndex: number) => {
-    dragCardRef.current = cardIndex;
-  }, []);
-
-  const handleDrop = useCallback((position: number) => {
-    const cardIndex = dragCardRef.current;
-    if (cardIndex == null) return;
-    dragCardRef.current = null;
+  const handleSlotTap = useCallback((position: number) => {
+    if (selectedCard == null) return;
 
     const newPlacements = [...placements] as (number | null)[];
     const newRotations = [...rotations];
 
-    const existingPos = newPlacements.indexOf(cardIndex);
+    // Remove card from its current position if already placed
+    const existingPos = newPlacements.indexOf(selectedCard);
     if (existingPos !== -1) {
       newPlacements[existingPos] = null;
       newRotations[existingPos] = 0;
     }
 
-    if (newPlacements[position] != null) {
-      if (existingPos !== -1) {
-        newPlacements[existingPos] = newPlacements[position];
-        newRotations[existingPos] = newRotations[position];
-      }
+    // Swap if slot is occupied
+    if (newPlacements[position] != null && existingPos !== -1) {
+      newPlacements[existingPos] = newPlacements[position];
+      newRotations[existingPos] = newRotations[position];
     }
 
-    newPlacements[position] = cardIndex;
+    newPlacements[position] = selectedCard;
     if (existingPos === -1) {
       newRotations[position] = 0;
     }
 
+    setSelectedCard(null);
     sendPlacement(newPlacements, newRotations);
-  }, [placements, rotations, sendPlacement]);
+  }, [selectedCard, placements, rotations, sendPlacement]);
 
   const handleRotate = useCallback((position: number) => {
     const newRotations = [...rotations];
@@ -146,31 +141,41 @@ export function ResolutionPhase({
 
   const allPlaced = placements.every((p) => p !== null);
   const spectatorName = playerNames.get(spectatorSeat) ?? `Player ${spectatorSeat + 1}`;
-  const attemptLabel = guess?.attempt === 2 ? 'Second Attempt' : 'First Attempt';
+  const attemptLabel = guess?.attempt === 2 ? 'ATTEMPT 2' : 'ATTEMPT 1';
+  const decoyLabel = boardState.decoyCount === 0
+    ? '(no decoys)'
+    : boardState.decoyCount === 1
+      ? '(1 decoy card)'
+      : `(${boardState.decoyCount} decoy cards)`;
 
   return (
-    <div className="flex flex-col gap-3 p-3">
-      <div className="text-center">
-        <h2 className="text-lg font-bold text-white">
+    <div className="flex flex-col gap-2 p-2">
+      {/* Header */}
+      <div className="text-center px-2">
+        <h2 className="text-base font-bold text-white">
           {spectatorName}&apos;s Clover
         </h2>
-        <p className="text-sm text-stone-400">
-          {attemptLabel} — Place and rotate cards to match the clues
-        </p>
+        <div className="flex items-center justify-center gap-2 mt-0.5">
+          <span className="text-[0.65rem] uppercase tracking-widest text-amber-300 font-semibold">
+            {attemptLabel}
+          </span>
+          <span className="text-[0.6rem] text-stone-500">{decoyLabel}</span>
+        </div>
         {guess?.attempt === 2 && guess.firstAttemptResults && (
           <p className="text-xs text-amber-400 mt-1">
-            Incorrect cards removed. Place the remaining cards.
+            Incorrect cards removed — place the remaining ones
           </p>
         )}
       </div>
 
+      {/* Clover board */}
       <div className="flex justify-center">
         <CloverBoard
           cards={boardState.keywordCards}
           placements={placements}
           rotations={rotations}
           clues={spectatorClover.clues}
-          onDrop={handleDrop}
+          onSlotTap={handleSlotTap}
           onRotate={handleRotate}
           onRemove={handleRemove}
           highlights={guess?.firstAttemptResults?.map((r) =>
@@ -180,48 +185,61 @@ export function ResolutionPhase({
         />
       </div>
 
+      {/* Card tray */}
       <CardTray
         cards={boardState.keywordCards}
         cardIndices={availableCardIndices}
         placedIndices={placements}
-        onDragStart={handleDragStart}
+        selectedCard={selectedCard}
+        onSelectCard={setSelectedCard}
       />
 
-      <Button
-        onClick={handleSubmitGuess}
-        disabled={!allPlaced || submitting}
-        className={cn(
-          'mx-auto gap-2',
-          allPlaced
-            ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
-            : 'bg-stone-700 text-stone-400'
-        )}
-      >
-        {submitting ? (
-          <Loader2 className="w-4 h-4 animate-spin" />
-        ) : (
-          <CheckCircle className="w-4 h-4" />
-        )}
-        Submit Guess
-      </Button>
+      {/* Submit button */}
+      <div className="flex justify-center">
+        <Button
+          onClick={handleSubmitGuess}
+          disabled={!allPlaced || submitting}
+          size="sm"
+          className={cn(
+            'gap-2',
+            allPlaced
+              ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+              : 'bg-stone-700 text-stone-400'
+          )}
+        >
+          {submitting ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <CheckCircle className="w-4 h-4" />
+          )}
+          Submit Guess
+        </Button>
+      </div>
 
-      {/* Round progress */}
-      <div className="flex justify-center gap-1 mt-1">
-        {boardState.spectatorOrder.map((seat, idx) => (
-          <div
-            key={seat}
-            className={cn(
-              'w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold',
-              idx < boardState.currentSpectatorIdx
-                ? 'bg-emerald-600 text-white'
-                : idx === boardState.currentSpectatorIdx
-                  ? 'bg-amber-500 text-white ring-2 ring-amber-300'
-                  : 'bg-stone-700 text-stone-500'
-            )}
-          >
-            {boardState.roundScores[seat] ?? (idx <= boardState.currentSpectatorIdx ? '?' : '·')}
-          </div>
-        ))}
+      {/* Round progress dots */}
+      <div className="flex justify-center gap-1.5 mt-1">
+        {boardState.spectatorOrder.map((seat, idx) => {
+          const name = playerNames.get(seat);
+          const initial = name ? name[0].toUpperCase() : String(seat + 1);
+          return (
+            <div
+              key={seat}
+              className={cn(
+                'w-7 h-7 rounded-full flex items-center justify-center text-[0.6rem] font-bold',
+                idx < boardState.currentSpectatorIdx
+                  ? 'bg-emerald-600 text-white'
+                  : idx === boardState.currentSpectatorIdx
+                    ? 'bg-amber-500 text-white ring-2 ring-amber-300'
+                    : 'bg-stone-700 text-stone-500'
+              )}
+              title={name}
+            >
+              {boardState.roundScores[seat] != null
+                ? boardState.roundScores[seat]
+                : initial}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
