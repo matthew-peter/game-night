@@ -8,7 +8,7 @@ interface CardTrayProps {
   cardIndices: number[];
   placedIndices: (number | null)[];
   selectedCard: number | null;
-  onSelectCard: (cardIndex: number | null) => void;
+  onSelectCard?: (cardIndex: number | null) => void;
 }
 
 export function CardTray({
@@ -18,14 +18,22 @@ export function CardTray({
   selectedCard,
   onSelectCard,
 }: CardTrayProps) {
+  const interactive = !!onSelectCard;
   const placedSet = new Set(placedIndices.filter((i): i is number => i !== null));
   const availableCards = cardIndices.filter((idx) => !placedSet.has(idx));
 
   return (
     <div className="flex flex-col items-center gap-2 py-2 px-2">
-      <span className="text-[0.65rem] text-emerald-200/60 uppercase tracking-widest font-medium">
-        Tap a card, then tap a slot
-      </span>
+      {interactive && (
+        <span className="text-[0.65rem] text-emerald-200/60 uppercase tracking-widest font-medium">
+          Tap a card, then tap a slot
+        </span>
+      )}
+      {!interactive && availableCards.length > 0 && (
+        <span className="text-[0.65rem] text-stone-500 uppercase tracking-widest font-medium">
+          Available cards
+        </span>
+      )}
       <div className="flex flex-wrap justify-center gap-2">
         {availableCards.map((cardIdx) => (
           <KeywordCard
@@ -33,10 +41,12 @@ export function CardTray({
             words={cards[cardIdx]}
             rotation={0}
             selected={selectedCard === cardIdx}
-            onSelect={() =>
-              onSelectCard(selectedCard === cardIdx ? null : cardIdx)
+            onSelect={interactive
+              ? () => onSelectCard(selectedCard === cardIdx ? null : cardIdx)
+              : undefined
             }
             size="sm"
+            dimmed={false}
           />
         ))}
         {availableCards.length === 0 && (

@@ -253,16 +253,14 @@ export function ResolutionPhase({
         />
       </div>
 
-      {/* Card tray — only shown to driver */}
-      {isDriver && (
-        <CardTray
-          cards={boardState.keywordCards}
-          cardIndices={availableCardIndices}
-          placedIndices={placements}
-          selectedCard={selectedCard}
-          onSelectCard={setSelectedCard}
-        />
-      )}
+      {/* Card tray — interactive for driver, read-only for observers */}
+      <CardTray
+        cards={boardState.keywordCards}
+        cardIndices={availableCardIndices}
+        placedIndices={placements}
+        selectedCard={isDriver ? selectedCard : null}
+        onSelectCard={isDriver ? setSelectedCard : undefined}
+      />
 
       {/* Submit button — any non-spectator can submit */}
       <div className="flex justify-center gap-2">
