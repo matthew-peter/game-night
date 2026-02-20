@@ -44,9 +44,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className="bg-stone-950">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background h-full`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-stone-950 text-foreground h-full`}
       >
         {children}
         <Toaster position="bottom-center" />
