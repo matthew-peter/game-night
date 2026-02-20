@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { CloverBoard } from './CloverBoard';
 import { CardTray } from './CardTray';
 import { SoCloverBoardState } from '@/lib/game/soclover/types';
-import { getCurrentSpectatorSeat, getResolutionCardIndices } from '@/lib/game/soclover/logic';
+import { getCurrentSpectatorSeat } from '@/lib/game/soclover/logic';
 import { cn } from '@/lib/utils';
 import { CheckCircle, Loader2, Hand } from 'lucide-react';
 import { toast } from 'sonner';
@@ -40,11 +40,10 @@ export function ResolutionPhase({
   const [takingControl, setTakingControl] = useState(false);
   const [selectedCard, setSelectedCard] = useState<number | null>(null);
 
-  const availableCardIndices = useMemo(
-    () => getResolutionCardIndices(boardState, spectatorSeat),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [spectatorSeat, spectatorClover.cardIndices, JSON.stringify(spectatorClover.decoyCardIndices)]
-  );
+  const availableCardIndices = guess?.availableCardOrder ?? [
+    ...spectatorClover.cardIndices,
+    ...spectatorClover.decoyCardIndices,
+  ];
 
   const placements = guess?.placements ?? [null, null, null, null];
   const rotations = guess?.rotations ?? [0, 0, 0, 0];

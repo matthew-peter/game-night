@@ -88,6 +88,7 @@ export interface CurrentGuess {
   attempt: 1 | 2;
   firstAttemptResults: boolean[] | null;
   driverSeat: number | null;     // seat of the player currently controlling the board
+  availableCardOrder: number[];  // shuffled once at round start, stable across re-renders
 }
 
 export interface SoCloverBoardState {

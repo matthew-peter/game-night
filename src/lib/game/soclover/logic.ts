@@ -231,22 +231,36 @@ export function getCurrentSpectatorSeat(
 
 /**
  * Get the card indices available for guessing during a resolution round:
- * the 4 real cards + N decoy cards, shuffled.
+ * the 4 real cards + N decoy cards (unshuffled — use availableCardOrder on
+ * CurrentGuess for the stable display order).
  */
 export function getResolutionCardIndices(
   boardState: SoCloverBoardState,
   spectatorSeat: number
 ): number[] {
   const clover = boardState.clovers[spectatorSeat];
-  return shuffle([...clover.cardIndices, ...clover.decoyCardIndices]);
+  return [...clover.cardIndices, ...clover.decoyCardIndices];
 }
 
-export function createFreshGuess(): CurrentGuess {
+/**
+ * Create a fresh guess with a shuffled card order that's stable for the
+ * entire round (stored in the DB, not recomputed on render).
+ */
+export function createFreshGuess(
+  boardState?: SoCloverBoardState,
+  spectatorSeat?: number
+): CurrentGuess {
+  let availableCardOrder: number[] = [];
+  if (boardState != null && spectatorSeat != null) {
+    const all = getResolutionCardIndices(boardState, spectatorSeat);
+    availableCardOrder = shuffle(all);
+  }
   return {
     placements: [null, null, null, null],
     rotations: [0, 0, 0, 0],
     attempt: 1,
     firstAttemptResults: null,
     driverSeat: null,
+    availableCardOrder,
   };
 }

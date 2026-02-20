@@ -94,7 +94,8 @@ export async function POST(
       if (allCluesSubmitted(updatedBoardState)) {
         newPhase = 'resolution';
         updatedBoardState.currentSpectatorIdx = 0;
-        updatedBoardState.currentGuess = createFreshGuess();
+        const firstSpectator = updatedBoardState.spectatorOrder[0];
+        updatedBoardState.currentGuess = createFreshGuess(updatedBoardState, firstSpectator);
       }
 
       const { data: updatedRow, error: updateError } = await supabase
@@ -133,8 +134,9 @@ export async function POST(
         return NextResponse.json({ error: 'Spectator cannot take control' }, { status: 400 });
       }
 
+      const spectatorSeatForGuess = getCurrentSpectatorSeat(boardState)!;
       const updatedGuess = {
-        ...(boardState.currentGuess ?? createFreshGuess()),
+        ...(boardState.currentGuess ?? createFreshGuess(boardState, spectatorSeatForGuess)),
         driverSeat: seat,
       };
 
@@ -181,8 +183,9 @@ export async function POST(
         return NextResponse.json({ error: 'Invalid placement data' }, { status: 400 });
       }
 
+      const spectatorSeatForPlace = getCurrentSpectatorSeat(boardState)!;
       const updatedGuess = {
-        ...(boardState.currentGuess ?? createFreshGuess()),
+        ...(boardState.currentGuess ?? createFreshGuess(boardState, spectatorSeatForPlace)),
         placements,
         rotations,
         driverSeat: seat,
@@ -257,6 +260,7 @@ export async function POST(
           attempt: 2,
           firstAttemptResults: results,
           driverSeat: null,
+          availableCardOrder: boardState.currentGuess.availableCardOrder,
         };
       } else {
         const roundIdx = boardState.currentSpectatorIdx;
@@ -300,7 +304,8 @@ export async function POST(
           return NextResponse.json({ success: true, score, totalScore, gameComplete: true });
         } else {
           updatedBoardState.currentSpectatorIdx = boardState.currentSpectatorIdx + 1;
-          updatedBoardState.currentGuess = createFreshGuess();
+          const nextSpectator = updatedBoardState.spectatorOrder[updatedBoardState.currentSpectatorIdx];
+          updatedBoardState.currentGuess = createFreshGuess(updatedBoardState, nextSpectator);
         }
       }
 
