@@ -88,10 +88,10 @@ export function ScrabbleBoard({
   }, [cells, pendingSet, onCellDrop, onRemovePending, disabled]);
 
   return (
-    <div className="w-full max-w-[min(100vw-16px,460px)] mx-auto">
-      {/* Board frame — warm wood with rounded corners and deep shadow */}
+    <div className="w-full max-w-[min(100vw-8px,460px)] mx-auto">
+      {/* Board frame */}
       <div
-        className="grid gap-[2px] p-[4px] rounded-2xl bg-gradient-to-br from-[#A08A6A] to-[#7A6548] shadow-[0_6px_24px_rgba(0,0,0,0.18),0_2px_6px_rgba(0,0,0,0.1)]"
+        className="grid gap-[1px] sm:gap-[2px] p-[3px] sm:p-[4px] rounded-xl sm:rounded-2xl bg-gradient-to-br from-[#A08A6A] to-[#7A6548] shadow-[0_6px_24px_rgba(0,0,0,0.18),0_2px_6px_rgba(0,0,0,0.1)]"
         style={{ gridTemplateColumns: `repeat(${BOARD_SIZE}, 1fr)` }}
       >
         {Array.from({ length: BOARD_SIZE }).map((_, row) =>
@@ -142,14 +142,14 @@ export function ScrabbleBoard({
                   <>
                     {premium && (
                       <span className={cn(
-                        'text-[8px] sm:text-[10px] leading-none select-none',
+                        'text-[clamp(6px,1.8vw,10px)] leading-none select-none',
                         PREMIUM[premium].text,
                       )}>
                         {PREMIUM[premium].label}
                       </span>
                     )}
                     {isCenter && !premium && (
-                      <span className="text-[12px] sm:text-sm text-[#8B2252]/50 select-none">★</span>
+                      <span className="text-[clamp(8px,2vw,14px)] text-[#8B2252]/50 select-none">★</span>
                     )}
                   </>
                 )}

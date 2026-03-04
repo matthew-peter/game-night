@@ -26,28 +26,31 @@ export function TileRack({
   const [dragIndex, setDragIndex] = useState<number | null>(null);
 
   return (
-    <div className="flex items-center justify-center gap-2 px-3 py-3">
+    <div className="flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 sm:py-3">
       {tiles.map((tile, index) => (
-        <ScrabbleTile
-          key={`rack-${index}-${tile}-${selectedIndices.has(index)}`}
-          letter={tile === '_' ? '' : tile}
-          isBlank={tile === '_'}
-          isSelected={selectedIndices.has(index)}
-          isDragging={dragIndex === index}
-          variant="rack"
-          onClick={disabled ? undefined : () => onTileClick(index)}
-          onDragStart={disabled || mode === 'exchange' ? undefined : (e) => {
-            setDragIndex(index);
-            onDragStart(index, e);
-          }}
-          onDragEnd={(e) => {
-            setDragIndex(null);
-            onDragEnd(e);
-          }}
-        />
+        <div key={`rack-${index}-${tile}-${selectedIndices.has(index)}`} className="rack-tile-slot">
+          <ScrabbleTile
+            letter={tile === '_' ? '' : tile}
+            isBlank={tile === '_'}
+            isSelected={selectedIndices.has(index)}
+            isDragging={dragIndex === index}
+            variant="rack"
+            onClick={disabled ? undefined : () => onTileClick(index)}
+            onDragStart={disabled || mode === 'exchange' ? undefined : (e) => {
+              setDragIndex(index);
+              onDragStart(index, e);
+            }}
+            onDragEnd={(e) => {
+              setDragIndex(null);
+              onDragEnd(e);
+            }}
+          />
+        </div>
       ))}
       {Array.from({ length: Math.max(0, RACK_SIZE - tiles.length) }).map((_, i) => (
-        <div key={`e-${i}`} className="w-[50px] h-[50px] sm:w-14 sm:h-14 rounded-xl border-2 border-dashed border-stone-200" />
+        <div key={`e-${i}`} className="rack-tile-slot">
+          <div className="w-full h-full rounded-lg sm:rounded-xl border-2 border-dashed border-stone-200" />
+        </div>
       ))}
     </div>
   );

@@ -39,7 +39,7 @@ export function ScrabbleTile({
         // ── Size ──
         isBoard
           ? 'w-full h-full rounded-[2px]'
-          : 'w-[50px] h-[50px] sm:w-14 sm:h-14 rounded-xl',
+          : 'w-full h-full rounded-lg sm:rounded-xl',
 
         // ── Surface ──
         variant === 'board'
@@ -64,7 +64,7 @@ export function ScrabbleTile({
       <span className="inline-flex items-end gap-0 -mt-[2px]">
         <span className={cn(
           'font-bold leading-[0.85]',
-          isBoard ? 'text-[19px] sm:text-[21px]' : 'text-[30px] sm:text-[34px]',
+          isBoard ? 'text-[clamp(11px,3.5vw,21px)]' : 'text-[1.5rem] sm:text-[2rem]',
         )}>
           {letter || ''}
         </span>
@@ -72,8 +72,8 @@ export function ScrabbleTile({
           <span className={cn(
             'font-semibold leading-none text-[#6B5B45] -mb-[1px]',
             isBoard
-              ? 'text-[8px] sm:text-[10px] ml-[0.5px]'
-              : 'text-[13px] sm:text-[15px] ml-[1px]',
+              ? 'text-[clamp(5px,1.5vw,10px)] ml-[0.5px]'
+              : 'text-[0.6rem] sm:text-[0.85rem] ml-[1px]',
           )}>
             {value}
           </span>

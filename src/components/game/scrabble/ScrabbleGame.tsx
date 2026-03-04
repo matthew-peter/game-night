@@ -396,8 +396,9 @@ export function ScrabbleGame({
     <div className="fixed inset-0 bg-[#F5F0E8] flex flex-col overflow-hidden">
       <Header />
 
-      {/* Scoreboard — full-width colored banner */}
-      <div className="shrink-0">
+      {/* Scrollable area: scoreboard + board */}
+      <div className="flex-1 min-h-0 overflow-y-auto game-scroll-area">
+        {/* Scoreboard */}
         <ScrabbleScoreboard
           boardState={boardState}
           players={players}
@@ -405,37 +406,34 @@ export function ScrabbleGame({
           mySeat={mySeat}
           userId={user.id}
         />
+
+        {/* Emoji + chat strip */}
+        <div className="flex items-center justify-end gap-1 px-2 py-0.5">
+          <Reactions gameId={game.id} playerId={user.id} compact />
+          <GameChat
+            gameId={game.id}
+            playerId={user.id}
+            playerName={user.username}
+            otherPlayers={chatOtherPlayers}
+          />
+        </div>
+
+        {/* Board */}
+        <div className="px-1 pb-2">
+          <ScrabbleBoard
+            cells={boardState.cells}
+            pendingPlacements={pendingPlacements}
+            onCellDrop={handleCellDrop}
+            onRemovePending={handleRemovePending}
+            disabled={!isMyTurn || isSubmitting}
+            hasSelectedTile={hasSelectedRackTile}
+            isMyTurn={isMyTurn}
+          />
+        </div>
       </div>
 
-      {/* Emoji + chat strip */}
-      <div className="shrink-0 flex items-center justify-end gap-1 px-2 py-1">
-        <Reactions gameId={game.id} playerId={user.id} compact />
-        <GameChat
-          gameId={game.id}
-          playerId={user.id}
-          playerName={user.username}
-          otherPlayers={chatOtherPlayers}
-        />
-      </div>
-
-      {/* Board */}
-      <div className="shrink-0 px-1">
-        <ScrabbleBoard
-          cells={boardState.cells}
-          pendingPlacements={pendingPlacements}
-          onCellDrop={handleCellDrop}
-          onRemovePending={handleRemovePending}
-          disabled={!isMyTurn || isSubmitting}
-          hasSelectedTile={hasSelectedRackTile}
-          isMyTurn={isMyTurn}
-        />
-      </div>
-
-      {/* Spacer */}
-      <div className="flex-1 max-h-2" />
-
-      {/* Rack + actions — bottom */}
-      <div className="shrink-0" style={{ paddingBottom: 'calc(4px + env(safe-area-inset-bottom))' }}>
+      {/* Rack + actions — pinned to bottom */}
+      <div className="shrink-0 bg-[#F5F0E8] border-t border-stone-300/50" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
         <TileRack
           tiles={displayedRackTiles.map(t => t.letter)}
           selectedIndices={selectedRackIndices}

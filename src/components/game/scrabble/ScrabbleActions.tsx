@@ -24,7 +24,7 @@ interface ScrabbleActionsProps {
   isCheckingWord?: boolean;
 }
 
-const actionBtn = 'flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl active:scale-95 transition-all';
+const actionBtn = 'flex items-center gap-1 px-2.5 py-1.5 text-[0.7rem] font-medium rounded-lg sm:rounded-xl active:scale-95 transition-all';
 
 export function ScrabbleActions({
   isMyTurn,
@@ -49,7 +49,7 @@ export function ScrabbleActions({
   // ── Not my turn ───────────────────────────────────────────────────────
   if (!isMyTurn) {
     return (
-      <div className="flex items-center justify-between py-2 px-4">
+      <div className="flex items-center justify-between py-1.5 px-3">
         <div className="flex items-center gap-2 text-stone-400 text-sm">
           <span className="w-2 h-2 rounded-full bg-stone-300 animate-pulse" />
           Their turn...
@@ -70,7 +70,7 @@ export function ScrabbleActions({
   // ── Exchange mode ─────────────────────────────────────────────────────
   if (mode === 'exchange') {
     return (
-      <div className="px-4 py-2.5 space-y-2">
+      <div className="px-3 py-2 space-y-1.5">
         <div className="text-xs text-center text-stone-500 font-medium">
           Tap tiles to select, then swap
         </div>
@@ -94,7 +94,7 @@ export function ScrabbleActions({
   const showFormedWord = hasPendingTiles && formedWord.length >= 2;
 
   return (
-    <div className="px-4 py-2 space-y-1.5">
+    <div className="px-3 py-1.5 space-y-1">
       {/* Formed word + check */}
       {showFormedWord && dictionaryMode !== 'off' && (
         <div className="flex items-center justify-center gap-2">
@@ -158,7 +158,7 @@ export function ScrabbleActions({
           onClick={onPlay}
           disabled={!hasPendingTiles || isSubmitting}
           className={cn(
-            'flex items-center gap-1.5 px-6 py-2.5 text-sm font-semibold rounded-xl transition-all active:scale-95',
+            'flex items-center gap-1 px-4 py-2 text-sm font-semibold rounded-lg sm:rounded-xl transition-all active:scale-95',
             'disabled:opacity-30 disabled:cursor-not-allowed',
             hasPendingTiles
               ? 'bg-gradient-to-b from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white shadow-md shadow-emerald-600/25'

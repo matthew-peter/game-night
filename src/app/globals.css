@@ -153,6 +153,19 @@ body.game-page-active {
   overscroll-behavior: contain;
 }
 
+/* Hide scrollbar but keep scrolling */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Responsive tile rack slots — fit 7 tiles + gaps in available width */
+.rack-tile-slot {
+  width: calc((100vw - 2rem) / 7 - 4px);
+  height: calc((100vw - 2rem) / 7 - 4px);
+  max-width: 56px;
+  max-height: 56px;
+  flex-shrink: 0;
+}
+
 /* Reaction animation */
 @keyframes reaction-pop {
   0% {
