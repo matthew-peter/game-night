@@ -22,6 +22,7 @@ import { createEmptyBoard } from './board';
 import { createTileBag, drawTiles, returnTilesToBag, getTileValue } from './tiles';
 import { calculatePlayScore, calculateRackValue } from './scoring';
 import { validatePlacement, validateExchange } from './validation';
+import { isInDictionary } from './dictionary';
 
 // ── Game Creation ────────────────────────────────────────────────────────────
 
@@ -138,7 +139,7 @@ export function placeTiles(
     tileBag: newBag,
     racks: newRacks,
     scores: newScores,
-    consecutivePasses: 0, // Reset on successful play
+    consecutivePasses: 0,
     firstMoveMade: true,
     turnNumber: boardState.turnNumber + 1,
     dictionaryMode: boardState.dictionaryMode,
@@ -148,6 +149,8 @@ export function placeTiles(
       tiles: placements,
       words,
       totalScore,
+      tilesDrawn: drawn,
+      previousConsecutivePasses: boardState.consecutivePasses,
     },
   };
 
@@ -288,6 +291,104 @@ export function passTurn(
     newBoardState,
     nextTurn,
     gameOver,
+  };
+}
+
+// ── Challenge ────────────────────────────────────────────────────────────────
+
+export interface ChallengeResult {
+  success: boolean;
+  error?: string;
+  challengeValid: boolean; // true = word was invalid, play reversed
+  invalidWords?: string[];
+  newBoardState?: ScrabbleBoardState;
+  nextTurn?: Seat;
+}
+
+/**
+ * Process a challenge against the last play.
+ * Checks all words from the last play against the dictionary.
+ * If any word is invalid: reverses the play, restores the board, turn goes
+ * back to the challenged player.
+ * If all words are valid: challenge fails, play stands, current player continues.
+ */
+export function challengePlay(
+  boardState: ScrabbleBoardState,
+  challengerSeat: Seat,
+  playerCount: number,
+): ChallengeResult {
+  const lp = boardState.lastPlay;
+  if (!lp || lp.type !== 'place' || !lp.tiles || !lp.words) {
+    return { success: false, error: 'No play to challenge', challengeValid: false };
+  }
+
+  // Check all formed words against dictionary
+  const invalid: string[] = [];
+  for (const w of lp.words) {
+    if (!isInDictionary(w.word)) {
+      invalid.push(w.word);
+    }
+  }
+
+  if (invalid.length === 0) {
+    // Challenge fails — all words valid. No state change.
+    return { success: true, challengeValid: false, nextTurn: challengerSeat };
+  }
+
+  // Challenge succeeds — reverse the play
+  const newCells = boardState.cells.map(row => row.map(c => c ? { ...c } : null));
+  for (const p of lp.tiles) {
+    newCells[p.row][p.col] = null;
+  }
+
+  // Restore the challenged player's rack: remove drawn tiles, add back played tiles
+  const challengedSeat = lp.playerSeat;
+  const currentRack = [...boardState.racks[challengedSeat]];
+
+  // Remove drawn tiles from rack
+  const tilesDrawn = lp.tilesDrawn ?? [];
+  for (const t of tilesDrawn) {
+    const idx = currentRack.indexOf(t);
+    if (idx !== -1) currentRack.splice(idx, 1);
+  }
+
+  // Add back the tiles that were played (blanks go back as '_')
+  for (const p of lp.tiles) {
+    currentRack.push(p.isBlank ? '_' : p.letter);
+  }
+
+  const newRacks = boardState.racks.map((r, i) =>
+    i === challengedSeat ? currentRack : [...r]
+  );
+
+  // Return drawn tiles to the bag
+  const newBag = [...boardState.tileBag, ...tilesDrawn];
+
+  // Subtract the score that was awarded
+  const newScores = [...boardState.scores];
+  newScores[challengedSeat] -= (lp.totalScore ?? 0);
+
+  // Turn goes back to the challenged player
+  const nextTurn = challengedSeat as Seat;
+
+  const newBoardState: ScrabbleBoardState = {
+    cells: newCells,
+    tileBag: newBag,
+    racks: newRacks,
+    scores: newScores,
+    consecutivePasses: lp.previousConsecutivePasses ?? 0,
+    firstMoveMade: boardState.firstMoveMade && boardState.turnNumber > 2,
+    turnNumber: boardState.turnNumber,
+    dictionaryMode: boardState.dictionaryMode,
+    lastPlay: undefined,
+  };
+
+  return {
+    success: true,
+    challengeValid: true,
+    invalidWords: invalid,
+    newBoardState,
+    nextTurn,
   };
 }
 

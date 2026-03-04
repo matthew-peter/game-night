@@ -307,6 +307,49 @@ export function ScrabbleGame({
     }
   }, [game.id, isSubmitting, onGameUpdated]);
 
+  // ── Challenge ──────────────────────────────────────────────────────────
+  const handleChallenge = useCallback(async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
+    try {
+      const res = await fetch(`/api/games/${game.id}/scrabble-move`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ moveType: 'challenge' }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.error || 'Challenge failed');
+        return;
+      }
+
+      if (data.challengeValid) {
+        const words = (data.invalidWords ?? []).join(', ');
+        toast.success(`Challenge successful! ${words} not in dictionary. Play reversed.`);
+      } else {
+        toast.info('Challenge failed — all words are valid!');
+      }
+
+      onGameUpdated();
+    } catch {
+      toast.error('Network error — please try again');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [game.id, isSubmitting, onGameUpdated]);
+
+  // Derive last play player name for challenge UI
+  const lastPlayPlayerName = useMemo(() => {
+    const lp = boardState.lastPlay;
+    if (!lp) return undefined;
+    const p = players.find(pl => pl.seat === lp.playerSeat);
+    if (!p) return `Player ${lp.playerSeat + 1}`;
+    return p.user_id === user.id ? 'You' : p.user?.username ?? `Player ${lp.playerSeat + 1}`;
+  }, [boardState.lastPlay, players, user.id]);
+
   // ── Game over view ────────────────────────────────────────────────────
   if (game.status === 'completed') {
     const maxScore = Math.max(...boardState.scores);
@@ -454,6 +497,7 @@ export function ScrabbleGame({
           onExchange={handleExchange}
           onPass={handlePass}
           onRecall={handleRecall}
+          onChallenge={boardState.lastPlay?.playerSeat !== mySeat ? handleChallenge : undefined}
           onToggleMode={() => {
             setMode(m => m === 'play' ? 'exchange' : 'play');
             setSelectedRackIndices(new Set());
@@ -467,6 +511,8 @@ export function ScrabbleGame({
           formedWord={formedWord}
           wordCheckResult={wordCheckResult}
           isCheckingWord={isCheckingWord}
+          lastPlay={boardState.lastPlay}
+          lastPlayPlayerName={lastPlayPlayerName}
         />
       </div>
 

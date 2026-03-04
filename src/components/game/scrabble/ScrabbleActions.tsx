@@ -1,7 +1,8 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { ArrowLeftRight, SkipForward, RotateCcw, Search, Check, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { LastPlay } from '@/lib/game/scrabble/types';
+import { ArrowLeftRight, SkipForward, RotateCcw, Search, Check, CheckCircle, XCircle, Loader2, ShieldAlert } from 'lucide-react';
 
 interface ScrabbleActionsProps {
   isMyTurn: boolean;
@@ -14,6 +15,7 @@ interface ScrabbleActionsProps {
   onPass: () => void;
   onRecall: () => void;
   onToggleMode: () => void;
+  onChallenge?: () => void;
   onCheckWord?: () => void;
   onCheckFormedWord?: () => void;
   isSubmitting: boolean;
@@ -22,6 +24,8 @@ interface ScrabbleActionsProps {
   formedWord?: string;
   wordCheckResult?: 'valid' | 'invalid' | null;
   isCheckingWord?: boolean;
+  lastPlay?: LastPlay;
+  lastPlayPlayerName?: string;
 }
 
 const actionBtn = 'flex items-center gap-1 px-2.5 py-1.5 text-[0.7rem] font-medium rounded-lg sm:rounded-xl active:scale-95 transition-all';
@@ -37,6 +41,7 @@ export function ScrabbleActions({
   onPass,
   onRecall,
   onToggleMode,
+  onChallenge,
   onCheckWord,
   onCheckFormedWord,
   isSubmitting,
@@ -45,24 +50,49 @@ export function ScrabbleActions({
   formedWord = '',
   wordCheckResult = null,
   isCheckingWord = false,
+  lastPlay,
+  lastPlayPlayerName,
 }: ScrabbleActionsProps) {
+  const canChallenge = !hasPendingTiles
+    && dictionaryMode === 'friendly'
+    && lastPlay?.type === 'place'
+    && onChallenge;
+
   // ── Not my turn ───────────────────────────────────────────────────────
   if (!isMyTurn) {
     return (
-      <div className="flex items-center justify-between py-1.5 px-3">
-        <div className="flex items-center gap-2 text-stone-400 text-sm">
-          <span className="w-2 h-2 rounded-full bg-stone-300 animate-pulse" />
-          Their turn...
-        </div>
-        {dictionaryMode !== 'off' && onCheckWord && (
-          <button
-            onClick={onCheckWord}
-            className={cn(actionBtn, 'text-stone-500 bg-stone-100 hover:bg-stone-200')}
-          >
-            <Search className="w-3.5 h-3.5" />
-            Look up
-          </button>
+      <div className="px-3 py-1.5 space-y-1">
+        {canChallenge && (
+          <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+            <span className="text-[0.7rem] text-amber-800">
+              <span className="font-semibold">{lastPlayPlayerName ?? 'Opponent'}</span> played{' '}
+              <span className="font-bold uppercase">{lastPlay.words?.map(w => w.word).join(', ')}</span>
+            </span>
+            <button
+              onClick={onChallenge}
+              disabled={isSubmitting}
+              className={cn(actionBtn, 'text-white bg-amber-600 hover:bg-amber-500 shadow-sm disabled:opacity-40')}
+            >
+              <ShieldAlert className="w-3.5 h-3.5" />
+              {isSubmitting ? 'Checking...' : 'Challenge'}
+            </button>
+          </div>
         )}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-stone-400 text-sm">
+            <span className="w-2 h-2 rounded-full bg-stone-300 animate-pulse" />
+            Their turn...
+          </div>
+          {dictionaryMode !== 'off' && onCheckWord && (
+            <button
+              onClick={onCheckWord}
+              className={cn(actionBtn, 'text-stone-500 bg-stone-100 hover:bg-stone-200')}
+            >
+              <Search className="w-3.5 h-3.5" />
+              Look up
+            </button>
+          )}
+        </div>
       </div>
     );
   }
@@ -95,6 +125,24 @@ export function ScrabbleActions({
 
   return (
     <div className="px-3 py-1.5 space-y-1">
+      {/* Challenge banner */}
+      {canChallenge && (
+        <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+          <span className="text-[0.7rem] text-amber-800">
+            <span className="font-semibold">{lastPlayPlayerName ?? 'Opponent'}</span> played{' '}
+            <span className="font-bold uppercase">{lastPlay.words?.map(w => w.word).join(', ')}</span>
+          </span>
+          <button
+            onClick={onChallenge}
+            disabled={isSubmitting}
+            className={cn(actionBtn, 'text-white bg-amber-600 hover:bg-amber-500 shadow-sm disabled:opacity-40')}
+          >
+            <ShieldAlert className="w-3.5 h-3.5" />
+            {isSubmitting ? 'Checking...' : 'Challenge'}
+          </button>
+        </div>
+      )}
+
       {/* Formed word + check */}
       {showFormedWord && dictionaryMode !== 'off' && (
         <div className="flex items-center justify-center gap-2">
@@ -114,7 +162,7 @@ export function ScrabbleActions({
       )}
 
       {/* Hint */}
-      {!hasPendingTiles && !hasSelectedRackTile && (
+      {!hasPendingTiles && !hasSelectedRackTile && !canChallenge && (
         <div className="text-xs text-stone-400 text-center">Tap a tile, then tap the board</div>
       )}
       {hasSelectedRackTile && !hasPendingTiles && (

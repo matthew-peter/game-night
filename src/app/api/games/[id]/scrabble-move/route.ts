@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { Seat } from '@/lib/supabase/types';
 import { ScrabbleBoardState, TilePlacement, MAX_SCORELESS_TURNS } from '@/lib/game/scrabble/types';
-import { placeTiles, exchangeTiles, passTurn } from '@/lib/game/scrabble/logic';
+import { placeTiles, exchangeTiles, passTurn, challengePlay } from '@/lib/game/scrabble/logic';
 import { loadServerDictionary } from '@/lib/game/scrabble/dictionary-server';
 import { pushToUser } from '@/lib/pushNotify';
 
@@ -59,7 +59,7 @@ export async function POST(
     const mySeat: Seat = playerRow.seat;
     const currentTurn: Seat = gameData.current_turn;
 
-    if (mySeat !== currentTurn) {
+    if (mySeat !== currentTurn && moveType !== 'challenge') {
       return NextResponse.json({ error: "It's not your turn" }, { status: 400 });
     }
 
@@ -269,6 +269,67 @@ export async function POST(
         nextTurn: result.nextTurn,
         scorelessTurns: result.newBoardState.consecutivePasses,
         maxScorelessTurns: MAX_SCORELESS_TURNS,
+      });
+    }
+
+    // ── Challenge ──────────────────────────────────────────────────────
+    if (moveType === 'challenge') {
+      if (boardState.dictionaryMode !== 'friendly') {
+        return NextResponse.json({ error: 'Challenges are only available in friendly mode' }, { status: 400 });
+      }
+
+      if (boardState.lastPlay?.playerSeat === mySeat) {
+        return NextResponse.json({ error: "You can't challenge your own play" }, { status: 400 });
+      }
+
+      const result = challengePlay(boardState, mySeat, playerCount);
+
+      if (!result.success) {
+        return NextResponse.json({ error: result.error }, { status: 400 });
+      }
+
+      await supabase.from('moves').insert({
+        game_id: id,
+        player_id: user.id,
+        move_type: 'challenge',
+        move_data: {
+          challengeValid: result.challengeValid,
+          invalidWords: result.invalidWords,
+          challengedSeat: boardState.lastPlay?.playerSeat,
+        },
+      } as Record<string, unknown>);
+
+      if (result.challengeValid && result.newBoardState) {
+        // Challenge succeeded — reverse the play, turn goes to challenged player
+        const { error: updateError } = await supabase
+          .from('games')
+          .update({
+            board_state: result.newBoardState,
+            current_turn: result.nextTurn,
+          })
+          .eq('id', id);
+
+        if (updateError) {
+          console.error('Error updating game:', updateError);
+          return NextResponse.json({ error: 'Failed to update game' }, { status: 500 });
+        }
+
+        // Notify the challenged player that their play was reversed
+        const challengedPlayer = playersBySeat.get(boardState.lastPlay!.playerSeat);
+        if (challengedPlayer && challengedPlayer.user_id !== user.id) {
+          await pushToUser(
+            challengedPlayer.user_id,
+            id,
+            `${actingPlayerName} challenged your play! Word invalid — your turn again.`
+          ).catch(() => {});
+        }
+      }
+      // If challenge failed, no board state change needed
+
+      return NextResponse.json({
+        success: true,
+        challengeValid: result.challengeValid,
+        invalidWords: result.invalidWords,
       });
     }
 

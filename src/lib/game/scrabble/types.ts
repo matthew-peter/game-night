@@ -32,7 +32,7 @@ export interface FormedWord {
   cells: { row: number; col: number }[];
 }
 
-/** Info about the last play (for display) */
+/** Info about the last play (for display and challenge reversal) */
 export interface LastPlay {
   playerSeat: Seat;
   type: 'place' | 'exchange' | 'pass';
@@ -40,6 +40,10 @@ export interface LastPlay {
   words?: FormedWord[];
   totalScore?: number;
   tilesExchanged?: number;
+  /** Tiles drawn from bag after this play (needed to reverse on challenge) */
+  tilesDrawn?: TileLetter[];
+  /** consecutivePasses before this play (needed to restore on challenge) */
+  previousConsecutivePasses?: number;
 }
 
 /**
@@ -84,7 +88,7 @@ export interface ScrabbleBoardState {
 }
 
 /** Scrabble move types */
-export type ScrabbleMoveType = 'place_tiles' | 'exchange_tiles' | 'pass';
+export type ScrabbleMoveType = 'place_tiles' | 'exchange_tiles' | 'pass' | 'challenge';
 
 /** Data stored in move_data JSONB for Scrabble moves */
 export interface ScrabbleMoveData {
