@@ -146,7 +146,7 @@ function WaitingRoomContent({ gameId }: { gameId: string }) {
   }
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-stone-50">
+    <div className="min-h-screen flex flex-col bg-stone-50">
       <Header />
       
       <main className="flex-1 overflow-y-auto">

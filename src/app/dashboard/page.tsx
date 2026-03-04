@@ -418,10 +418,10 @@ function DashboardContent() {
   };
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-stone-50">
+    <div className="min-h-screen flex flex-col bg-stone-50">
       <Header />
 
-      <main className="flex-1 overflow-y-auto" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      <main className="flex-1 overflow-y-auto -webkit-overflow-scrolling-touch" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
       <div className="max-w-lg mx-auto px-4 py-4">
         <h1 className="text-xl font-bold text-stone-800 mb-4">
           Welcome, {user.username}!

@@ -126,11 +126,8 @@
   input, textarea, select {
     font-size: 16px;
   }
-  /* Lock viewport height and prevent overscroll bounce */
   html, body {
     height: 100%;
-    overflow: hidden;
-    overscroll-behavior: none;
   }
   html {
     overflow-anchor: none;
