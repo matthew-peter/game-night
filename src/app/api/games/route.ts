@@ -55,7 +55,7 @@ export async function POST(request: Request) {
         status: 'waiting',
         current_turn: 0,
         current_phase: 'play',
-        min_players: 2,
+        min_players: maxPlayers,
         max_players: maxPlayers,
         board_state: boardState,
         // Codenames-specific fields (nullable defaults)
