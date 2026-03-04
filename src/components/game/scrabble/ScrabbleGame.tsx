@@ -437,7 +437,17 @@ export function ScrabbleGame({
 
   return (
     <div className="fixed inset-0 bg-[#F5F0E8] flex flex-col overflow-hidden">
-      <Header />
+      <Header gameActions={
+        <>
+          <Reactions gameId={game.id} playerId={user.id} compact />
+          <GameChat
+            gameId={game.id}
+            playerId={user.id}
+            playerName={user.username}
+            otherPlayers={chatOtherPlayers}
+          />
+        </>
+      } />
 
       {/* Scrollable area: scoreboard + board */}
       <div className="flex-1 min-h-0 overflow-y-auto game-scroll-area">
@@ -449,17 +459,6 @@ export function ScrabbleGame({
           mySeat={mySeat}
           userId={user.id}
         />
-
-        {/* Emoji + chat strip */}
-        <div className="flex items-center justify-end gap-1 px-2 py-0.5">
-          <Reactions gameId={game.id} playerId={user.id} compact />
-          <GameChat
-            gameId={game.id}
-            playerId={user.id}
-            playerName={user.username}
-            otherPlayers={chatOtherPlayers}
-          />
-        </div>
 
         {/* Board */}
         <div className="px-1 pb-2">

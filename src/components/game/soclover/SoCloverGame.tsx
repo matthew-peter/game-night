@@ -80,7 +80,17 @@ export function SoCloverGame({
 
   return (
     <div className="game-viewport fixed inset-0 bg-gradient-to-b from-green-900 via-emerald-800 to-green-950 flex flex-col overflow-hidden">
-      <Header />
+      <Header gameActions={
+        <>
+          <Reactions gameId={game.id} playerId={user.id} compact />
+          <GameChat
+            gameId={game.id}
+            playerId={user.id}
+            playerName={user.username}
+            otherPlayers={chatOtherPlayers}
+          />
+        </>
+      } />
 
       {/* Status bar */}
       <div className="flex items-center justify-between px-3 py-1.5 bg-green-800/50 border-b border-green-700/30">
@@ -113,17 +123,6 @@ export function SoCloverGame({
             <span>{players.length}</span>
           </div>
         </div>
-      </div>
-
-      {/* Chat + emoji strip */}
-      <div className="shrink-0 flex items-center justify-end gap-1 px-2 py-1 bg-green-900/30">
-        <Reactions gameId={game.id} playerId={user.id} compact />
-        <GameChat
-          gameId={game.id}
-          playerId={user.id}
-          playerName={user.username}
-          otherPlayers={chatOtherPlayers}
-        />
       </div>
 
       {/* Main content */}

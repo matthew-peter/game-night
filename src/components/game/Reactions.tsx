@@ -5,11 +5,9 @@ import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 import { createPortal } from 'react-dom';
 
-const REACTIONS = [
-  '👏', '🧠', '😅', '🔥', '😭',
-  '🤞', '❤️', '🎉', '😱', '🤔',
-  '👀', '💀', '🙈', '😤', '🥳',
-];
+const QUICK_REACTIONS = ['👏', '🔥', '😅', '❤️', '😱'];
+
+const EMOJI_REGEX = /\p{Emoji_Presentation}|\p{Extended_Pictographic}/gu;
 
 interface ReactionsProps {
   gameId: string;
@@ -30,30 +28,25 @@ export function Reactions({ gameId, playerId, compact = false }: ReactionsProps)
   const supabase = useMemo(() => createClient(), []);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  /** Show a reaction on screen (for both sender and receiver) */
   const showReaction = useCallback((emoji: string, fromSelf: boolean) => {
     const reactionId = `${Date.now()}-${Math.random()}`;
     setDisplayReactions((prev) => [...prev, { emoji, id: reactionId, fromSelf }]);
-
-    // Remove after animation completes
     setTimeout(() => {
       setDisplayReactions((prev) => prev.filter((r) => r.id !== reactionId));
     }, 2500);
   }, []);
 
-  // Subscribe to reactions from the other player
   useEffect(() => {
     const channel = supabase
       .channel(`reactions-${gameId}`)
       .on('broadcast', { event: 'reaction' }, (payload) => {
-        // Only show reactions from the other player here —
-        // the sender already sees their own via the local call in sendReaction
         if (payload.payload.senderId !== playerId) {
           showReaction(payload.payload.emoji, false);
         }
@@ -72,8 +65,6 @@ export function Reactions({ gameId, playerId, compact = false }: ReactionsProps)
     async (emoji: string) => {
       setLastSentEmoji(emoji);
       setIsOpen(false);
-
-      // Show it locally so the sender sees their own reaction immediately
       showReaction(emoji, true);
 
       if (channelRef.current) {
@@ -84,15 +75,31 @@ export function Reactions({ gameId, playerId, compact = false }: ReactionsProps)
         });
       }
 
-      // Brief feedback on the button then clear
       setTimeout(() => setLastSentEmoji(null), 800);
     },
     [playerId, showReaction]
   );
 
+  const handleInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const val = e.target.value;
+      const emojis = val.match(EMOJI_REGEX);
+      if (emojis && emojis.length > 0) {
+        sendReaction(emojis[emojis.length - 1]);
+        e.target.value = '';
+      }
+    },
+    [sendReaction]
+  );
+
+  useEffect(() => {
+    if (isOpen) {
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  }, [isOpen]);
+
   return (
     <>
-      {/* Reaction trigger button */}
       <button
         ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
@@ -108,12 +115,10 @@ export function Reactions({ gameId, playerId, compact = false }: ReactionsProps)
         {lastSentEmoji || '😊'}
       </button>
 
-      {/* Reaction picker — portal with backdrop so tapping elsewhere closes it */}
       {isOpen &&
         mounted &&
         createPortal(
           <>
-            {/* Invisible backdrop to close picker on outside tap */}
             <div
               className="fixed inset-0 z-[98]"
               onClick={() => setIsOpen(false)}
@@ -121,8 +126,8 @@ export function Reactions({ gameId, playerId, compact = false }: ReactionsProps)
             <div
               className={cn(
                 'fixed bg-stone-800 rounded-xl p-2 shadow-xl border border-stone-600',
-                'grid grid-cols-5 gap-1 animate-in slide-in-from-top-2 duration-150 z-[99]',
-                compact ? 'w-48' : 'w-56'
+                'animate-in slide-in-from-top-2 duration-150 z-[99]',
+                'w-56'
               )}
               style={{
                 top: buttonRef.current
@@ -134,27 +139,37 @@ export function Reactions({ gameId, playerId, compact = false }: ReactionsProps)
                   : 12,
               }}
             >
-              {REACTIONS.map((emoji) => (
-                <button
-                  key={emoji}
-                  onClick={() => sendReaction(emoji)}
-                  className={cn(
-                    'hover:bg-stone-700 rounded-lg active:scale-90 transition-transform flex items-center justify-center',
-                    compact ? 'w-8 h-8 text-lg' : 'w-10 h-10 text-xl'
-                  )}
-                >
-                  {emoji}
-                </button>
-              ))}
+              {/* Quick-access emoji row */}
+              <div className="flex items-center justify-between mb-1.5">
+                {QUICK_REACTIONS.map((emoji) => (
+                  <button
+                    key={emoji}
+                    onClick={() => sendReaction(emoji)}
+                    className="w-9 h-9 text-xl hover:bg-stone-700 rounded-lg active:scale-90 transition-transform flex items-center justify-center"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+
+              {/* Native emoji input */}
+              <input
+                ref={inputRef}
+                type="text"
+                onChange={handleInputChange}
+                placeholder="Or pick any emoji..."
+                className="w-full bg-stone-700 text-white text-sm rounded-lg px-3 py-2
+                           placeholder:text-stone-400 outline-none focus:ring-2 focus:ring-amber-400/50
+                           border border-stone-600"
+                style={{ fontSize: '16px' }}
+                autoComplete="off"
+                autoCapitalize="off"
+              />
             </div>
           </>,
           document.body
         )}
 
-      {/* ── Reaction display (center screen) ──────────────────────────── */}
-      {/* Both sender and receiver see the emoji pop.
-          - Received reactions: full size, centered
-          - Sent reactions: slightly smaller, same position (shared moment) */}
       {mounted &&
         displayReactions.map((reaction) =>
           createPortal(

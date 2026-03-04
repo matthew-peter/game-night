@@ -4,9 +4,7 @@ import { Game, Move, Seat } from '@/lib/supabase/types';
 import { countAgentsFound, countTotalAgentsNeeded, getRemainingAgentsPerSeat } from '@/lib/game/gameLogic';
 import { cn } from '@/lib/utils';
 import { TappableClueWord } from './TappableClueWord';
-import { Reactions } from './Reactions';
 import { PresenceIndicator } from './PresenceIndicator';
-import { GameChat } from './GameChat';
 
 interface GameStatusProps {
   game: Game;
@@ -93,23 +91,6 @@ export function GameStatus({ game, mySeat, opponentName, opponentId, currentClue
               <span className="text-emerald-400">{agentsFound}</span>
               <span className="text-stone-400">/{totalAgents}</span>
             </div>
-            {userId && (
-              <div className="relative">
-                <Reactions gameId={game.id} playerId={userId} compact />
-              </div>
-            )}
-            {userId && (
-              <div className="relative">
-                <GameChat
-                  gameId={game.id}
-                  playerId={userId}
-                  playerName={userName || 'You'}
-                  otherPlayers={opponentId ? [{ userId: opponentId, name: opponentName || 'Partner' }] : []}
-                  opponentId={opponentId}
-                  opponentName={opponentName}
-                />
-              </div>
-            )}
           </div>
         </div>
 

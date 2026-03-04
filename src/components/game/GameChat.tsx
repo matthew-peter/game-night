@@ -311,7 +311,7 @@ export function GameChat({
         mounted &&
         createPortal(
           <div
-            className="fixed z-[98] pointer-events-none animate-chat-in"
+            className="fixed z-[98] animate-chat-in cursor-pointer"
             style={{
               top: buttonRef.current
                 ? buttonRef.current.getBoundingClientRect().bottom + 6
@@ -321,8 +321,15 @@ export function GameChat({
                   buttonRef.current.getBoundingClientRect().right
                 : 12,
             }}
+            onClick={() => {
+              setPeekMessage(null);
+              if (peekTimerRef.current) {
+                clearTimeout(peekTimerRef.current);
+                peekTimerRef.current = null;
+              }
+            }}
           >
-            <div className="bg-stone-800 border border-stone-600 rounded-lg px-3 py-2 max-w-[200px] shadow-lg animate-chat-fade pointer-events-auto">
+            <div className="bg-stone-800 border border-stone-600 rounded-lg px-3 py-2 max-w-[200px] shadow-lg animate-chat-fade">
               <div className="text-[10px] text-stone-400 mb-0.5 font-medium">
                 {peekMessage.sender}
               </div>

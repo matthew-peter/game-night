@@ -17,6 +17,8 @@ import { useGameStore } from '@/lib/store/gameStore';
 import { createClient } from '@/lib/supabase/client';
 import { Game, Move, Seat, GamePlayer, getOtherPlayers, findSeat } from '@/lib/supabase/types';
 import { processGuess, getNextSeat, getRemainingAgentsPerSeat } from '@/lib/game/gameLogic';
+import { Reactions } from '@/components/game/Reactions';
+import { GameChat } from '@/components/game/GameChat';
 import { toast } from 'sonner';
 
 function GamePageContent({ gameId }: { gameId: string }) {
@@ -549,7 +551,19 @@ function GamePageContent({ gameId }: { gameId: string }) {
 
   return (
     <div ref={gameViewportRef} className="game-viewport fixed inset-0 bg-gradient-to-b from-stone-800 via-stone-700 to-stone-900 flex flex-col overflow-hidden">
-      <Header />
+      <Header gameActions={user?.id ? (
+        <>
+          <Reactions gameId={game.id} playerId={user.id} compact />
+          <GameChat
+            gameId={game.id}
+            playerId={user.id}
+            playerName={user.username}
+            otherPlayers={primaryOpponent ? [{ userId: primaryOpponent.user_id, name: primaryOpponent.user?.username || 'Partner' }] : []}
+            opponentId={primaryOpponent?.user_id}
+            opponentName={primaryOpponent?.user?.username}
+          />
+        </>
+      ) : undefined} />
 
       <GameStatus
         game={game}

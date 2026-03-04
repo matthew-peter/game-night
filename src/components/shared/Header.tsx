@@ -12,8 +12,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Menu, LogOut, History, Home, RefreshCw } from 'lucide-react';
+import { ReactNode } from 'react';
 
-export function Header() {
+interface HeaderProps {
+  gameActions?: ReactNode;
+}
+
+export function Header({ gameActions }: HeaderProps) {
   const { user, signOut } = useAuth();
 
   return (
@@ -25,6 +30,7 @@ export function Header() {
 
         {user && (
           <div className="flex items-center gap-1">
+            {gameActions}
             <NotificationToggle />
             <DropdownMenu>
             <DropdownMenuTrigger asChild>
