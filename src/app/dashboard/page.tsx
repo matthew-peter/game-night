@@ -318,11 +318,15 @@ function DashboardContent() {
         .from('games')
         .select('*')
         .eq('pin', joinPin)
-        .eq('status', 'waiting')
         .single();
 
       if (fetchError || !game) {
-        toast.error('Game not found or already started');
+        toast.error('Game not found');
+        return;
+      }
+
+      if (game.status !== 'waiting') {
+        toast.error('Game has already started');
         return;
       }
 
@@ -372,7 +376,7 @@ function DashboardContent() {
 
       // If we have enough players, start the game
       const currentPlayerCount = takenSeats.size + 1;
-      if (currentPlayerCount >= (game.min_players ?? 2)) {
+      if (currentPlayerCount >= (game.max_players ?? 2)) {
         await supabase
           .from('games')
           .update({ status: 'playing' })

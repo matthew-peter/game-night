@@ -74,9 +74,9 @@ export async function POST(
 
     // Check if the game now has enough players to start
     const currentPlayerCount = takenSeats.size + 1;
-    const minPlayers = game.min_players ?? 2;
+    const maxPlayers = game.max_players ?? 2;
 
-    if (currentPlayerCount >= minPlayers) {
+    if (currentPlayerCount >= maxPlayers) {
       const { data: updatedGame, error: updateError } = await supabase
         .from('games')
         .update({ status: 'playing' })

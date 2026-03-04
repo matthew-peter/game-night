@@ -90,9 +90,9 @@ function JoinGameContent({ pin }: { pin: string }) {
         return;
       }
 
-      // Check if we have enough players to start
+      // If we have enough players, start the game
       const currentPlayerCount = takenSeats.size + 1;
-      if (currentPlayerCount >= (game.min_players ?? 2)) {
+      if (currentPlayerCount >= (game.max_players ?? 2)) {
         await supabase
           .from('games')
           .update({ status: 'playing' })
