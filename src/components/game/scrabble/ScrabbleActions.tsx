@@ -22,6 +22,7 @@ interface ScrabbleActionsProps {
   tilesInBag: number;
   dictionaryMode: string;
   formedWord?: string;
+  pendingScore?: number;
   wordCheckResult?: 'valid' | 'invalid' | null;
   isCheckingWord?: boolean;
   lastPlay?: LastPlay;
@@ -48,6 +49,7 @@ export function ScrabbleActions({
   tilesInBag,
   dictionaryMode,
   formedWord = '',
+  pendingScore = 0,
   wordCheckResult = null,
   isCheckingWord = false,
   lastPlay,
@@ -143,20 +145,31 @@ export function ScrabbleActions({
         </div>
       )}
 
-      {/* Formed word + check */}
-      {showFormedWord && dictionaryMode !== 'off' && (
+      {/* Formed word + score + check */}
+      {hasPendingTiles && (
         <div className="flex items-center justify-center gap-2">
-          <span className="text-sm font-bold uppercase tracking-wider text-stone-700">
-            {formedWord}
-          </span>
-          {wordCheckResult === 'valid' ? (
-            <span className="flex items-center gap-0.5 text-emerald-600 text-xs font-medium"><CheckCircle className="w-3.5 h-3.5" /> valid</span>
-          ) : wordCheckResult === 'invalid' ? (
-            <span className="flex items-center gap-0.5 text-red-500 text-xs font-medium"><XCircle className="w-3.5 h-3.5" /> not found</span>
-          ) : isCheckingWord ? (
-            <Loader2 className="w-3.5 h-3.5 text-stone-400 animate-spin" />
-          ) : (
-            <button onClick={onCheckFormedWord} className="text-xs font-medium text-blue-600 hover:text-blue-500 transition-colors">Check?</button>
+          {formedWord.length >= 2 && (
+            <span className="text-sm font-bold uppercase tracking-wider text-stone-700">
+              {formedWord}
+            </span>
+          )}
+          {pendingScore > 0 && (
+            <span className="text-sm font-bold tabular-nums text-emerald-700">
+              +{pendingScore}
+            </span>
+          )}
+          {showFormedWord && dictionaryMode !== 'off' && (
+            <>
+              {wordCheckResult === 'valid' ? (
+                <span className="flex items-center gap-0.5 text-emerald-600 text-xs font-medium"><CheckCircle className="w-3.5 h-3.5" /> valid</span>
+              ) : wordCheckResult === 'invalid' ? (
+                <span className="flex items-center gap-0.5 text-red-500 text-xs font-medium"><XCircle className="w-3.5 h-3.5" /> not found</span>
+              ) : isCheckingWord ? (
+                <Loader2 className="w-3.5 h-3.5 text-stone-400 animate-spin" />
+              ) : (
+                <button onClick={onCheckFormedWord} className="text-xs font-medium text-blue-600 hover:text-blue-500 transition-colors">Check?</button>
+              )}
+            </>
           )}
         </div>
       )}

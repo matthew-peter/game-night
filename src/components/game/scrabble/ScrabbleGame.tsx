@@ -11,6 +11,8 @@ import { Header } from '@/components/shared/Header';
 import { GameChat } from '@/components/game/GameChat';
 import { Game, Seat, GamePlayer, getOtherPlayers } from '@/lib/supabase/types';
 import { ScrabbleBoardState, TilePlacement, PlacedTile, DictionaryMode } from '@/lib/game/scrabble/types';
+import { calculatePlayScore } from '@/lib/game/scrabble/scoring';
+import { getTileValue } from '@/lib/game/scrabble/tiles';
 import { Reactions } from '@/components/game/Reactions';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -66,6 +68,22 @@ export function ScrabbleGame({
     () => detectFormedWord(boardState.cells, pendingPlacements),
     [boardState.cells, pendingPlacements]
   );
+
+  // Calculate the score for the current pending placement
+  const pendingScore = useMemo(() => {
+    if (pendingPlacements.length === 0) return 0;
+    try {
+      const testCells = boardState.cells.map(row => row.map(c => c ? { ...c } : null));
+      for (const p of pendingPlacements) {
+        const value = p.isBlank ? 0 : getTileValue(p.letter);
+        testCells[p.row][p.col] = { letter: p.letter.toUpperCase(), value, isBlank: p.isBlank };
+      }
+      const { totalScore } = calculatePlayScore(testCells, pendingPlacements);
+      return totalScore;
+    } catch {
+      return 0;
+    }
+  }, [boardState.cells, pendingPlacements]);
 
   // Word validity check state
   const [wordCheckResult, setWordCheckResult] = useState<'valid' | 'invalid' | null>(null);
@@ -508,6 +526,7 @@ export function ScrabbleGame({
           tilesInBag={boardState.tileBag.length}
           dictionaryMode={dictionaryMode}
           formedWord={formedWord}
+          pendingScore={pendingScore}
           wordCheckResult={wordCheckResult}
           isCheckingWord={isCheckingWord}
           lastPlay={boardState.lastPlay}
