@@ -5,7 +5,11 @@ import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 import { createPortal } from 'react-dom';
 
-const QUICK_REACTIONS = ['👏', '🔥', '😅', '❤️', '😱'];
+const REACTIONS = [
+  '👏', '🧠', '😅', '🔥', '😭',
+  '🤞', '❤️', '🎉', '😱', '🤔',
+  '👀', '💀', '🙈', '😤', '🥳',
+];
 
 const EMOJI_REGEX = /\p{Emoji_Presentation}|\p{Extended_Pictographic}/gu;
 
@@ -139,9 +143,9 @@ export function Reactions({ gameId, playerId, compact = false }: ReactionsProps)
                   : 12,
               }}
             >
-              {/* Quick-access emoji row */}
-              <div className="flex items-center justify-between mb-1.5">
-                {QUICK_REACTIONS.map((emoji) => (
+              {/* Emoji grid */}
+              <div className="grid grid-cols-5 gap-1 mb-2">
+                {REACTIONS.map((emoji) => (
                   <button
                     key={emoji}
                     onClick={() => sendReaction(emoji)}
@@ -152,7 +156,7 @@ export function Reactions({ gameId, playerId, compact = false }: ReactionsProps)
                 ))}
               </div>
 
-              {/* Native emoji input */}
+              {/* Native emoji input for full keyboard access */}
               <input
                 ref={inputRef}
                 type="text"
