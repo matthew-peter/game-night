@@ -81,13 +81,20 @@ const WordCard = memo(function WordCard({
           indicatorColor: 'bg-red-900 text-white',
         };
       } else if (isStillMyAgent) {
-        // ── KEY STATE: revealed as bystander, but this is MY agent ──
-        // Must be visually unmissable — pulsing green glow + distinct green card
+        // Revealed as bystander, but this is MY agent — still needs to be found
         return {
           card: 'bg-emerald-100 border-emerald-500 border-2 ring-2 ring-emerald-400/60 animate-pulse-subtle',
           text: 'text-emerald-900',
           indicator: '★ YOUR AGENT',
           indicatorColor: 'bg-emerald-600 text-white',
+        };
+      } else if (cardTypeForMe === 'assassin') {
+        // Revealed as bystander, but it's an assassin from MY view — keep it visually black
+        return {
+          card: 'bg-stone-700 border-stone-900',
+          text: 'text-stone-100',
+          indicator: guessedByMe ? '○ YOU' : '○ THEM',
+          indicatorColor: 'bg-amber-400 text-amber-900',
         };
       } else {
         return {
