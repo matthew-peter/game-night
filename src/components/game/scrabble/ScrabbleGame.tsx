@@ -13,6 +13,7 @@ import { Game, Seat, GamePlayer, getOtherPlayers } from '@/lib/supabase/types';
 import { ScrabbleBoardState, TilePlacement, PlacedTile, DictionaryMode } from '@/lib/game/scrabble/types';
 import { calculatePlayScore } from '@/lib/game/scrabble/scoring';
 import { getTileValue } from '@/lib/game/scrabble/tiles';
+import { FormedWord } from '@/lib/game/scrabble/types';
 import { Reactions } from '@/components/game/Reactions';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -63,54 +64,59 @@ export function ScrabbleGame({
 
   const dragTileIndex = useRef<number | null>(null);
 
-  // Detect the main word formed by current pending tiles
-  const formedWord = useMemo(
-    () => detectFormedWord(boardState.cells, pendingPlacements),
-    [boardState.cells, pendingPlacements]
-  );
-
-  // Calculate the score for the current pending placement
-  const pendingScore = useMemo(() => {
-    if (pendingPlacements.length === 0) return 0;
+  // Compute all formed words and total score for pending placements
+  const { allFormedWords, pendingScore } = useMemo(() => {
+    if (pendingPlacements.length === 0) return { allFormedWords: [] as FormedWord[], pendingScore: 0 };
     try {
       const testCells = boardState.cells.map(row => row.map(c => c ? { ...c } : null));
       for (const p of pendingPlacements) {
         const value = p.isBlank ? 0 : getTileValue(p.letter);
         testCells[p.row][p.col] = { letter: p.letter.toUpperCase(), value, isBlank: p.isBlank };
       }
-      const { totalScore } = calculatePlayScore(testCells, pendingPlacements);
-      return totalScore;
+      const { words, totalScore } = calculatePlayScore(testCells, pendingPlacements);
+      return { allFormedWords: words, pendingScore: totalScore };
     } catch {
-      return 0;
+      return { allFormedWords: [] as FormedWord[], pendingScore: 0 };
     }
   }, [boardState.cells, pendingPlacements]);
 
+  // Legacy single-word value for deps (used to reset check result)
+  const formedWordsKey = allFormedWords.map(w => w.word).join(',');
+
   // Word validity check state
   const [wordCheckResult, setWordCheckResult] = useState<'valid' | 'invalid' | null>(null);
+  const [invalidWords, setInvalidWords] = useState<string[]>([]);
   const [isCheckingWord, setIsCheckingWord] = useState(false);
 
-  // Reset check result when formed word changes
   useEffect(() => {
     setWordCheckResult(null);
-  }, [formedWord]);
+    setInvalidWords([]);
+  }, [formedWordsKey]);
 
-  const handleCheckFormedWord = useCallback(async () => {
-    if (!formedWord || formedWord.length < 2) return;
+  const handleCheckFormedWords = useCallback(async () => {
+    if (allFormedWords.length === 0) return;
     setIsCheckingWord(true);
     try {
-      const res = await fetch('/api/games/check-word', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ word: formedWord }),
-      });
-      const data = await res.json();
-      setWordCheckResult(data.valid ? 'valid' : 'invalid');
+      const results = await Promise.all(
+        allFormedWords.map(async (fw) => {
+          const res = await fetch('/api/games/check-word', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ word: fw.word }),
+          });
+          const data = await res.json();
+          return { word: fw.word, valid: data.valid };
+        })
+      );
+      const bad = results.filter(r => !r.valid).map(r => r.word);
+      setInvalidWords(bad);
+      setWordCheckResult(bad.length === 0 ? 'valid' : 'invalid');
     } catch {
-      toast.error('Could not check word');
+      toast.error('Could not check words');
     } finally {
       setIsCheckingWord(false);
     }
-  }, [formedWord]);
+  }, [allFormedWords]);
 
   // Reset pending state when turn changes (NOT when board_state ref changes —
   // the periodic sync creates new object refs which would wipe tiles mid-placement)
@@ -521,13 +527,14 @@ export function ScrabbleGame({
             setPendingPlacements([]);
           }}
           onCheckWord={() => setWordCheckerOpen(true)}
-          onCheckFormedWord={handleCheckFormedWord}
+          onCheckFormedWords={handleCheckFormedWords}
           isSubmitting={isSubmitting}
           tilesInBag={boardState.tileBag.length}
           dictionaryMode={dictionaryMode}
-          formedWord={formedWord}
+          allFormedWords={allFormedWords}
           pendingScore={pendingScore}
           wordCheckResult={wordCheckResult}
+          invalidWords={invalidWords}
           isCheckingWord={isCheckingWord}
           lastPlay={boardState.lastPlay}
           lastPlayPlayerName={lastPlayPlayerName}
@@ -564,59 +571,3 @@ function findRackIndexForPlacement(
   return -1;
 }
 
-/**
- * Detect the main word formed by pending placements on the current board.
- * Returns the word string (uppercase), or '' if placements are empty / invalid.
- */
-function detectFormedWord(
-  cells: (PlacedTile | null)[][],
-  placements: TilePlacement[]
-): string {
-  if (placements.length === 0) return '';
-
-  // Build a test board
-  const test = cells.map(row => row.map(c => c?.letter ?? null));
-  for (const p of placements) test[p.row][p.col] = p.letter.toUpperCase();
-
-  const allSameRow = placements.every(p => p.row === placements[0].row);
-  const allSameCol = placements.every(p => p.col === placements[0].col);
-
-  if (placements.length === 1) {
-    // Single tile — pick the longer axis word
-    const h = readWord(test, placements[0].row, placements[0].col, 0, 1);
-    const v = readWord(test, placements[0].row, placements[0].col, 1, 0);
-    return (h.length >= v.length ? h : v);
-  }
-
-  if (allSameRow) {
-    return readWord(test, placements[0].row, placements[0].col, 0, 1);
-  }
-  if (allSameCol) {
-    return readWord(test, placements[0].row, placements[0].col, 1, 0);
-  }
-  return '';
-}
-
-/** Read a contiguous word through (row,col) along direction (dr,dc). */
-function readWord(
-  board: (string | null)[][],
-  row: number,
-  col: number,
-  dr: number,
-  dc: number,
-): string {
-  // Find start of word
-  let r = row, c = col;
-  while (r - dr >= 0 && c - dc >= 0 && r - dr < 15 && c - dc < 15 && board[r - dr][c - dc]) {
-    r -= dr;
-    c -= dc;
-  }
-  // Read forward
-  let word = '';
-  while (r >= 0 && c >= 0 && r < 15 && c < 15 && board[r][c]) {
-    word += board[r][c];
-    r += dr;
-    c += dc;
-  }
-  return word;
-}

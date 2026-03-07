@@ -1,7 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { LastPlay } from '@/lib/game/scrabble/types';
+import { LastPlay, FormedWord } from '@/lib/game/scrabble/types';
 import { ArrowLeftRight, SkipForward, RotateCcw, Search, Check, CheckCircle, XCircle, Loader2, ShieldAlert } from 'lucide-react';
 
 interface ScrabbleActionsProps {
@@ -17,13 +17,14 @@ interface ScrabbleActionsProps {
   onToggleMode: () => void;
   onChallenge?: () => void;
   onCheckWord?: () => void;
-  onCheckFormedWord?: () => void;
+  onCheckFormedWords?: () => void;
   isSubmitting: boolean;
   tilesInBag: number;
   dictionaryMode: string;
-  formedWord?: string;
+  allFormedWords?: FormedWord[];
   pendingScore?: number;
   wordCheckResult?: 'valid' | 'invalid' | null;
+  invalidWords?: string[];
   isCheckingWord?: boolean;
   lastPlay?: LastPlay;
   lastPlayPlayerName?: string;
@@ -44,13 +45,14 @@ export function ScrabbleActions({
   onToggleMode,
   onChallenge,
   onCheckWord,
-  onCheckFormedWord,
+  onCheckFormedWords,
   isSubmitting,
   tilesInBag,
   dictionaryMode,
-  formedWord = '',
+  allFormedWords = [],
   pendingScore = 0,
   wordCheckResult = null,
+  invalidWords = [],
   isCheckingWord = false,
   lastPlay,
   lastPlayPlayerName,
@@ -123,7 +125,7 @@ export function ScrabbleActions({
   }
 
   // ── Play mode ─────────────────────────────────────────────────────────
-  const showFormedWord = hasPendingTiles && formedWord.length >= 2;
+  const hasWords = hasPendingTiles && allFormedWords.length > 0;
 
   return (
     <div className="px-3 py-1.5 space-y-1">
@@ -145,12 +147,12 @@ export function ScrabbleActions({
         </div>
       )}
 
-      {/* Formed word + score + check */}
+      {/* Formed words + score + check */}
       {hasPendingTiles && (
-        <div className="flex items-center justify-center gap-2">
-          {formedWord.length >= 2 && (
+        <div className="flex items-center justify-center gap-2 flex-wrap">
+          {hasWords && (
             <span className="text-sm font-bold uppercase tracking-wider text-stone-700">
-              {formedWord}
+              {allFormedWords.map(w => w.word).join(' · ')}
             </span>
           )}
           {pendingScore > 0 && (
@@ -158,16 +160,18 @@ export function ScrabbleActions({
               +{pendingScore}
             </span>
           )}
-          {showFormedWord && dictionaryMode !== 'off' && (
+          {hasWords && dictionaryMode !== 'off' && (
             <>
               {wordCheckResult === 'valid' ? (
-                <span className="flex items-center gap-0.5 text-emerald-600 text-xs font-medium"><CheckCircle className="w-3.5 h-3.5" /> valid</span>
+                <span className="flex items-center gap-0.5 text-emerald-600 text-xs font-medium"><CheckCircle className="w-3.5 h-3.5" /> all valid</span>
               ) : wordCheckResult === 'invalid' ? (
-                <span className="flex items-center gap-0.5 text-red-500 text-xs font-medium"><XCircle className="w-3.5 h-3.5" /> not found</span>
+                <span className="flex items-center gap-0.5 text-red-500 text-xs font-medium">
+                  <XCircle className="w-3.5 h-3.5" /> {invalidWords.join(', ')}
+                </span>
               ) : isCheckingWord ? (
                 <Loader2 className="w-3.5 h-3.5 text-stone-400 animate-spin" />
               ) : (
-                <button onClick={onCheckFormedWord} className="text-xs font-medium text-blue-600 hover:text-blue-500 transition-colors">Check?</button>
+                <button onClick={onCheckFormedWords} className="text-xs font-medium text-blue-600 hover:text-blue-500 transition-colors">Check?</button>
               )}
             </>
           )}
