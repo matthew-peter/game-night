@@ -1,5 +1,6 @@
 import webpush from 'web-push';
 import { createClient } from '@supabase/supabase-js';
+import { getAppUrl } from './appUrl';
 
 let vapidConfigured = false;
 
@@ -49,7 +50,7 @@ export async function pushToUser(
     }
 
     const subscription = JSON.parse(data.subscription);
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://game-night-gilt.vercel.app';
+    const appUrl = getAppUrl();
 
     const payload = JSON.stringify({
       title,

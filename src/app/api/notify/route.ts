@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import webpush from 'web-push';
+import { getAppUrl } from '@/lib/appUrl';
 
 // Configure web-push lazily — VAPID keys may not be set during build
 let vapidConfigured = false;
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest) {
     }
 
     const subscription = JSON.parse(subData.subscription);
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://game-night-gilt.vercel.app';
+    const appUrl = getAppUrl();
 
     const payload = JSON.stringify({
       title: title || "It's your turn!",
